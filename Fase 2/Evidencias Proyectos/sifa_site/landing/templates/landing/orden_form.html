@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+  <div class="glass-card p-4 shadow-soft">
+    <h3 class="page-title mb-3"><i class="bi bi-capsule-pill me-2"></i>{% if modo_edicion %}Editar{% else %}Agregar{% endif %} medicamento — Receta #{{ receta.id }}</h3>
+
+    {% if error_horas or error_producto or orden_form.errors %}
+      <div class="alert alert-danger">
+        <strong>Corrige los errores:</strong>
+        {% if error_horas %}<div class="mt-1">{{ error_horas }}</div>{% endif %}
+        {% if error_producto %}<div class="mt-1">{{ error_producto }}</div>{% endif %}
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="card border-0 mb-3">
+        <div class="card-header bg-transparent fw-bold d-flex justify-content-between">
+          <span>Medicamento</span>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="toggleNuevo">
+            <label class="form-check-label" for="toggleNuevo">Crear nuevo</label>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="bloqueSelect">
+            <label class="form-label">Seleccionar existente</label>
+            {{ orden_form.producto }}
+            <div class="row mt-3">
+              <div class="col-md-6">{{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}</div>
+              <div class="col-md-3">{{ orden_form.via.label_tag }} {{ orden_form.via }}</div>
+              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">{{ orden_form.activo }} {{ orden_form.activo.label_tag }}</div>
+            </div>
+            <div class="row mt-2">
+              <div class="col-md-3"><label class="form-label">Stock asignado</label>{{ orden_form.stock_asignado }}</div>
+              <div class="col-md-3"><label class="form-label">Stock crítico</label>{{ orden_form.stock_critico }}</div>
+            </div>
+            <div class="mt-3">{{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}</div>
+          </div>
+
+          <div id="bloqueNuevo" class="d-none">
+            <div class="alert alert-info py-2 mb-3">Completa solo si el medicamento no existe.</div>
+            <div class="row g-3">
+              <div class="col-md-5"><label class="form-label">Nombre</label>{{ producto_form.nombre }}</div>
+              <div class="col-md-3"><label class="form-label">Potencia</label>{{ producto_form.potencia }}</div>
+              <div class="col-md-4"><label class="form-label">Forma</label>{{ producto_form.forma }}</div>
+            </div>
+            <hr class="my-3">
+            <div class="row">
+              <div class="col-md-6">{{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}</div>
+              <div class="col-md-3">{{ orden_form.via.label_tag }} {{ orden_form.via }}</div>
+              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">{{ orden_form.activo }} {{ orden_form.activo.label_tag }}</div>
+            </div>
+            <div class="row mt-2">
+              <div class="col-md-3"><label class="form-label">Stock asignado</label>{{ orden_form.stock_asignado }}</div>
+              <div class="col-md-3"><label class="form-label">Stock crítico</label>{{ orden_form.stock_critico }}</div>
+            </div>
+            <div class="mt-3">{{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 mb-3">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Horas de administración</span>
+          <button type="button" class="btn btn-sm btn-gradient" id="btnAddHora"><i class="bi bi-plus-circle me-1"></i>Agregar hora</button>
+        </div>
+        <div class="card-body">
+          <div id="horasContainer" class="d-grid gap-2">
+            {% if horas_data %}
+              {% for item in horas_data %}
+                <div class="hora-row bg-light rounded-3 p-2 d-flex align-items-center gap-2">
+                  <div class="w-25">
+                    <label class="form-label mb-1 small">Hora</label>
+                    <input type="time" name="hora[]" class="form-control form-control-sm" value="{{ item.hora|time:'H:i' }}">
+                  </div>
+                  <div class="w-50 w-md-25">
+                    <label class="form-label mb-1 small">Día semana</label>
+                    <select name="dia[]" class="form-select form-select-sm">
+                      <option value="">Todos los días</option>
+                      <option value="0" {% if item.dia == 0 %}selected{% endif %}>Lun</option>
+                      <option value="1" {% if item.dia == 1 %}selected{% endif %}>Mar</option>
+                      <option value="2" {% if item.dia == 2 %}selected{% endif %}>Mié</option>
+                      <option value="3" {% if item.dia == 3 %}selected{% endif %}>Jue</option>
+                      <option value="4" {% if item.dia == 4 %}selected{% endif %}>Vie</option>
+                      <option value="5" {% if item.dia == 5 %}selected{% endif %}>Sáb</option>
+                      <option value="6" {% if item.dia == 6 %}selected{% endif %}>Dom</option>
+                    </select>
+                  </div>
+                  <div class="ms-auto"><button type="button" class="btn btn-sm btn-outline-danger btnRemove"><i class="bi bi-x-lg"></i></button></div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-muted small">Aún no has agregado horas.</div>
+            {% endif %}
+          </div>
+
+          <template id="rowTpl">
+            <div class="hora-row bg-light rounded-3 p-2 d-flex align-items-center gap-2">
+              <div class="w-25">
+                <label class="form-label mb-1 small">Hora</label>
+                <input type="time" name="hora[]" class="form-control form-control-sm">
+              </div>
+              <div class="w-50 w-md-25">
+                <label class="form-label mb-1 small">Día semana</label>
+                <select name="dia[]" class="form-select form-select-sm">
+                  <option value="">Todos los días</option>
+                  <option value="0">Lun</option>
+                  <option value="1">Mar</option>
+                  <option value="2">Mié</option>
+                  <option value="3">Jue</option>
+                  <option value="4">Vie</option>
+                  <option value="5">Sáb</option>
+                  <option value="6">Dom</option>
+                </select>
+              </div>
+              <div class="ms-auto"><button type="button" class="btn btn-sm btn-outline-danger btnRemove"><i class="bi bi-x-lg"></i></button></div>
+            </div>
+          </template>
+
+          {% if error_horas %}<div class="text-danger mt-2">{{ error_horas }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="text-end">
+        <button class="btn btn-gradient">
+          <i class="bi bi-save me-1"></i>{% if modo_edicion %}Guardar cambios{% else %}Agregar{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+/* mismo script que receta_form */
+(function () {
+  const toggle = document.querySelector('#toggleNuevo');
+  const bloqueSelect = document.querySelector('#bloqueSelect');
+  const bloqueNuevo  = document.querySelector('#bloqueNuevo');
+  const selectProducto = document.querySelector('#id_producto');
+  function setDisabled(container, disabled){ if(!container)return;
+    container.querySelectorAll('input,select,textarea').forEach(el=>{
+      if(disabled){ el.dataset.wasRequired = el.required?'1':''; el.required=false; el.disabled=true; }
+      else{ el.disabled=false; if(el.dataset.wasRequired==='1') el.required=true; }
+    });
+  }
+  function applyToggle(){ const creating = toggle && toggle.checked;
+    bloqueSelect.classList.toggle('d-none', creating);
+    bloqueNuevo.classList.toggle('d-none', !creating);
+    setDisabled(bloqueSelect, creating); setDisabled(bloqueNuevo, !creating);
+    if(creating && selectProducto) selectProducto.value='';
+  }
+  if (toggle){ toggle.addEventListener('change', applyToggle); applyToggle(); }
+
+  const cont=document.querySelector('#horasContainer'); const tpl=document.querySelector('#rowTpl'); const btnAdd=document.querySelector('#btnAddHora');
+  function wireRemove(btn){ if(!btn)return; btn.addEventListener('click', e=> e.target.closest('.hora-row').remove()); }
+  function addRow(){ const n=tpl.content.cloneNode(true); wireRemove(n.querySelector('.btnRemove')); cont.appendChild(n); }
+  if (btnAdd) btnAdd.addEventListener('click', addRow);
+  cont.querySelectorAll('.btnRemove').forEach(wireRemove);
+})();
+</script>
+{% endblock %}
+{% endblock %}

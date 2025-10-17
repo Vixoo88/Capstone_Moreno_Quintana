@@ -1,0 +1,72 @@
+/* Fondo con degradado azul */
+.sifa-bg{
+  min-height:100vh;
+  background: linear-gradient(135deg, #06a3f9 0%, #1e4fa8 100%);
+}
+
+/* Links del header */
+.sifa-nav{
+  color: #ffffffcc;
+  text-decoration: none;
+  font-weight: 600;
+}
+.sifa-nav:hover{ color: #fff; }
+
+/* Panel contenedor con gran borde redondeado y línea blanca */
+.sifa-panel{
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 22px;
+  padding: 48px 18px;
+  background: linear-gradient(145deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+}
+
+/* Card central estrecha */
+.sifa-login-card{
+  max-width: 420px;
+}
+
+/* Avatar circular blanco */
+.avatar-circle{
+  width: 96px; height: 96px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.8);
+  display: grid; place-items: center;
+}
+
+/* Inputs estilo píldora, borde blanco */
+.sifa-input{
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.85);
+  background: transparent;
+  color: #fff;
+  outline: none;
+}
+.sifa-input::placeholder{ color: rgba(255,255,255,.9); }
+.sifa-input:focus{
+  box-shadow: 0 0 0 4px rgba(255,255,255,.15);
+}
+
+/* Botón con degradado violeta/azul y pill */
+.btn-gradient-pill{
+  background-image: linear-gradient(90deg, #1b6cf2, #b86be0);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 10px 20px;
+}
+.btn-gradient-pill:hover{ opacity: .92; color: #fff; }
+
+/* Link “olvidaste” blanco tenue */
+.sifa-link{
+  color: rgba(255,255,255,.9);
+  text-decoration: none;
+}
+.sifa-link:hover{ color:#fff; text-decoration: underline; }
+
+/* Ajustes responsivos del panel para que se vea como la captura */
+@media (min-width: 992px){
+  .sifa-panel{ padding: 64px; }
+}

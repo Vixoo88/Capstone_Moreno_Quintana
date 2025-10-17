@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+  <h3 class="page-title mb-3">Administración de medicamentos — {{ hoy|date:"d/m/Y" }}</h3>
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    {% for h,c in horas %}
+      <a href="{% url 'admin_list_hoy' %}?h={{ h }}" class="chip {% if seleccion == h %}active{% endif %}">
+        <i class="bi bi-clock me-1"></i>{{ h }} <span class="badge text-bg-light ms-1">{{ c }}</span>
+      </a>
+    {% endfor %}
+    {% if seleccion %}
+      <a href="{% url 'admin_list_hoy' %}" class="chip"><i class="bi bi-ui-checks-grid me-1"></i>Ver todas</a>
+    {% endif %}
+  </div>
+
+  {% for hora, items in grupos.items %}
+    <div class="glass-card mb-3">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-clock me-2"></i>Hora {{ hora }}</strong>
+        <form method="post" action="{% url 'admin_marcar_grupo' %}?h={{ hora }}">
+          {% csrf_token %}
+          <input type="hidden" name="hora" value="{{ hora }}">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-success" name="estado" value="DADA"><i class="bi bi-check2-all me-1"></i>Dar todos</button>
+            <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">Omitir todos</button>
+            <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazar todos</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="list-group list-group-flush">
+        {% for e in items %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="me-3">
+                <div class="fw-semibold">{{ e.residente.nombre_completo }}</div>
+                <div class="text-muted small">{{ e.orden.producto.nombre }} {{ e.orden.producto.potencia }} — {{ e.orden.dosis }}</div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge badge-status {% if e.estado == 'DADA' %}text-bg-success{% elif e.estado == 'OMITIDA' %}text-bg-secondary{% elif e.estado == 'RECHAZADA' %}text-bg-danger{% else %}text-bg-dark{% endif %}">
+                  {{ e.get_estado_display }}
+                </span>
+                <form method="post" action="{% url 'admin_marcar_rapido' e.id %}?h={{ hora }}">
+                  {% csrf_token %}
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-success" name="estado" value="DADA">Dar</button>
+                    <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">Omitida</button>
+                    <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazada</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {% if e.estado != 'PENDIENTE' and e.realizada_por %}
+              <div class="mt-2 text-muted small">
+                por {{ e.realizada_por.get_full_name|default:e.realizada_por.username }} · {{ e.programada_para|date:"H:i" }}
+              </div>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="list-group-item text-muted">Sin residentes para esta hora.</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% empty %}
+    <div class="glass-card p-4 text-center text-secondary">No hay administraciones programadas para hoy.</div>
+  {% endfor %}
+</div>
+{% endblock %}

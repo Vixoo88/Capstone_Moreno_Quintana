@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width:860px;">
+  <div class="glass-card p-4">
+    <h3 class="page-title mb-3"><i class="bi bi-person-circle me-2"></i>Nuevo residente</h3>
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="col-md-8">{{ form.nombre_completo.label_tag }} {{ form.nombre_completo }}</div>
+      <div class="col-md-4">{{ form.rut.label_tag }} {{ form.rut }}</div>
+      <div class="col-md-4">{{ form.fecha_nacimiento.label_tag }} {{ form.fecha_nacimiento }}</div>
+      <div class="col-md-4">{{ form.sexo.label_tag }} {{ form.sexo }}</div>
+      <div class="col-md-12">{{ form.alergias.label_tag }} {{ form.alergias }}</div>
+      <div class="col-md-3 form-check ms-2">{{ form.activo }} {{ form.activo.label_tag }}</div>
+      <div class="col-12 text-end"><button class="btn btn-gradient">Guardar</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

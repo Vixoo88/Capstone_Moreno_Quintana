@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="page-title mb-0">Residentes</h2>
+    <a class="btn btn-gradient" href="{% url 'residente_create' %}">
+      <i class="bi bi-person-plus me-1"></i> Nuevo residente
+    </a>
+  </div>
+
+  {% if residentes %}
+    <div class="row g-3">
+      {% for r in residentes %}
+        <div class="col-md-6 col-lg-4">
+          <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-start justify-content-between">
+              <div>
+                <div class="fw-bold">{{ r.nombre_completo }}</div>
+                {% if r.rut %}<div class="small text-secondary">RUT: {{ r.rut }}</div>{% endif %}
+              </div>
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+            </div>
+            <a class="stretched-link" href="{% url 'residente_detail' r.id %}"></a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="glass-card p-4 text-center">
+      <div class="text-secondary">Aún no hay residentes.</div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

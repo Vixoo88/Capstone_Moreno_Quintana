@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<!-- ====== CSS específico de esta página ====== -->
+<style>
+  /* ====== HERO / CARRUSEL con background-image (ajuste perfecto) ====== */
+  .hero-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Altura responsiva:
+     - mínimo: 340px
+     - preferido: 62vh
+     - máximo: 760px
+     Cambia los valores si lo quieres más alto/bajo.
+  */
+  .hero-slide {
+    position: relative;
+    height: clamp(340px, 62vh, 760px);
+    isolation: isolate; /* para pseudo-elementos */
+  }
+
+  /* Imagen como FONDO: siempre llena, sin deformarse ni bandas */
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover; /* <- clave para que se ajuste sin bandas */
+    z-index: 0;
+  }
+
+  /* Overlay suave para contraste en caso de que la foto tenga texto */
+  .hero-slide::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.06) 40%, rgba(0,0,0,0.12));
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* Asegurar visibilidad de flechas e indicadores por sobre el overlay */
+  .carousel-control-prev,
+  .carousel-control-next { z-index: 3; width: 10%; }
+
+  .carousel-indicators { z-index: 3; }
+  .carousel-indicators [data-bs-target] {
+    width: 10px; height: 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.8);
+    margin: 0 6px;
+  }
+  .carousel-indicators .active { background: #fff; }
+
+  .carousel-control-prev-icon,
+  .carousel-control-next-icon {
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  }
+
+  /* ====== Ajustes para móvil (<=576px): un poco más compacto ====== */
+  @media (max-width: 575.98px) {
+    .hero-slide { height: clamp(280px, 56vh, 560px); }
+    .carousel-control-prev,
+    .carousel-control-next { width: 16%; }
+    .carousel-control-prev-icon,
+    .carousel-control-next-icon { transform: scale(1.08); }
+    .carousel-indicators [data-bs-target] { width: 12px; height: 12px; margin: 0 8px; }
+    .carousel-indicators { bottom: 10px; }
+  }
+
+  /* ====== Ajustes para tablet (576–991px) ====== */
+  @media (min-width: 576px) and (max-width: 991.98px) {
+    .hero-slide { height: clamp(320px, 58vh, 640px); }
+    .carousel-control-prev,
+    .carousel-control-next { width: 12%; }
+  }
+
+  /* ====== utilidades / secciones ====== */
+  .py-6 { padding-top: 4rem; padding-bottom: 4rem; }
+  .benefit-box {
+    background: #f8f9fa;
+    border: 1px solid #eef0f2;
+    border-radius: .75rem;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    font-weight: 600;
+  }
+  .min-vh-40 { min-height: 40vh; }
+</style>
+
+<!-- ===== HERO / CARRUSEL (3 imágenes) ===== -->
+<section class="hero-wrapper" aria-label="Galería principal">
+  <div
+    id="heroCarousel"
+    class="carousel slide"
+    data-bs-ride="carousel"
+    data-bs-interval="6000"
+    data-bs-touch="true"
+    data-bs-keyboard="true"
+  >
+    <!-- Indicadores -->
+    <div class="carousel-indicators">
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+    </div>
+
+    <div class="carousel-inner">
+      <!-- Slide 1 -->
+      <div class="carousel-item active" aria-label="Imagen 1">
+        <div class="hero-slide">
+          <div class="hero-bg" style="background-image: url('{% static 'img/1.png' %}');"></div>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="carousel-item" aria-label="Imagen 2">
+        <div class="hero-slide">
+          <div class="hero-bg" style="background-image: url('{% static 'img/2.png' %}');"></div>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="carousel-item" aria-label="Imagen 3">
+        <div class="hero-slide">
+          <div class="hero-bg" style="background-image: url('{% static 'img/3.png' %}');"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flechas -->
+    <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev" aria-label="Anterior">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next" aria-label="Siguiente">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    </button>
+  </div>
+</section>
+
+<!-- ¿Qué es SIFA? -->
+<section id="que-es" class="py-6">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-4">¿Qué es SIFA?</h2>
+    <p class="lead text-center text-muted mb-5">
+      Plataforma que reduce tiempos operativos y asegura disponibilidad de medicamentos en residencias.
+    </p>
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body p-4">
+            <h5 class="card-title fw-bold">Inventario central</h5>
+            <p class="card-text text-muted">Recepción, bodega, lotes y vencimientos bajo control.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body p-4">
+            <h5 class="card-title fw-bold">Asignación por residente</h5>
+            <p class="card-text text-muted">Stock y recetas vinculadas a cada paciente.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body p-4">
+            <h5 class="card-title fw-bold">Horarios y adherencia</h5>
+            <p class="card-text text-muted">Registros de administración y alertas en tiempo real.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Cómo funciona -->
+<section id="como-funciona" class="py-6 bg-white border-top border-bottom">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-4">Cómo funciona</h2>
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <ol class="list-group list-group-numbered shadow-sm">
+          <li class="list-group-item p-4">Enfermería carga la receta médica y administra el stock general.</li>
+          <li class="list-group-item p-4">TENS preparan farmacia por paciente y destinan frascos por cuidadora.</li>
+          <li class="list-group-item p-4">Cuidadoras administran según horario y registran la toma.</li>
+          <li class="list-group-item p-4">Doctores validan y visualizan las recetas digitales.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Beneficios -->
+<section id="beneficios" class="py-6">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-4">Beneficios</h2>
+    <div class="row g-4">
+      <div class="col-md-4"><div class="benefit-box">Menos errores de administración</div></div>
+      <div class="col-md-4"><div class="benefit-box">Trazabilidad y auditoría</div></div>
+      <div class="col-md-4"><div class="benefit-box">Ahorro de tiempo operativo</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Contacto -->
+<section id="contacto" class="py-6 bg-white border-top">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-4">Contacto</h2>
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <form class="card shadow-sm border-0">
+          <div class="card-body p-4">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                <input type="text" class="form-control" placeholder="Tu nombre">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" placeholder="nombre@correo.com">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Mensaje</label>
+                <textarea class="form-control" rows="4" placeholder="Cuéntanos sobre tu residencia"></textarea>
+              </div>
+            </div>
+            <div class="mt-4 d-flex justify-content-end">
+              <button type="button" class="btn btn-primary">Enviar</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
