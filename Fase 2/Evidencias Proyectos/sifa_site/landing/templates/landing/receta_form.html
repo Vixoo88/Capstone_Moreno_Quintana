@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 <div class="container py-4" style="max-width: 980px;">
   <div class="glass-card p-4 shadow-soft">
@@ -56,7 +57,16 @@
           <div id="bloqueNuevo" class="d-none">
             <div class="alert alert-info py-2 mb-3">Completa solo si el medicamento no existe.</div>
             <div class="row g-3">
-              <div class="col-md-5"><label class="form-label">Nombre</label>{{ producto_form.nombre }}</div>
+              <div class="col-md-5 position-relative">
+                <label class="form-label">Nombre</label>
+                {{ producto_form.nombre }}
+                <!-- Caja de sugerencias con URL de la API -->
+                <div id="prod-suggest"
+                     class="list-group position-absolute w-100 d-none"
+                     style="z-index: 20; max-height: 260px; overflow:auto;"
+                     data-url="{% url 'api_productos_suggest' %}"></div>
+                <div class="form-text">Escribe al menos 2 letras para ver sugerencias.</div>
+              </div>
               <div class="col-md-3"><label class="form-label">Potencia</label>{{ producto_form.potencia }}</div>
               <div class="col-md-4"><label class="form-label">Forma</label>{{ producto_form.forma }}</div>
             </div>
@@ -144,46 +154,6 @@
 </div>
 
 {% block extra_js %}
-<script>
-(function () {
-  // Toggle crear nuevo / seleccionar
-  const toggle = document.querySelector('#toggleNuevo');
-  const bloqueSelect = document.querySelector('#bloqueSelect');
-  const bloqueNuevo  = document.querySelector('#bloqueNuevo');
-  const selectProducto = document.querySelector('#id_producto');
-
-  function setDisabled(container, disabled) {
-    if (!container) return;
-    container.querySelectorAll('input, select, textarea').forEach(el => {
-      if (disabled) {
-        el.dataset.wasRequired = el.required ? '1' : '';
-        el.required = false;
-        el.disabled = true;
-      } else {
-        el.disabled = false;
-        if (el.dataset.wasRequired === '1') el.required = true;
-      }
-    });
-  }
-  function applyToggle(){
-    const creating = toggle && toggle.checked;
-    bloqueSelect.classList.toggle('d-none', creating);
-    bloqueNuevo.classList.toggle('d-none', !creating);
-    setDisabled(bloqueSelect, creating);
-    setDisabled(bloqueNuevo, !creating);
-    if (creating && selectProducto) selectProducto.value = '';
-  }
-  if (toggle){ toggle.addEventListener('change', applyToggle); applyToggle(); }
-
-  // Horas dinámicas
-  const cont = document.querySelector('#horasContainer');
-  const tpl = document.querySelector('#rowTpl');
-  const btnAdd = document.querySelector('#btnAddHora');
-  function wireRemove(btn){ if(!btn)return; btn.addEventListener('click', e => e.target.closest('.hora-row').remove()); }
-  function addRow(){ const node=tpl.content.cloneNode(true); wireRemove(node.querySelector('.btnRemove')); cont.appendChild(node); }
-  if (btnAdd) btnAdd.addEventListener('click', addRow);
-  cont.querySelectorAll('.btnRemove').forEach(wireRemove);
-})();
-</script>
+  <script src="{% static 'landing/medicamento_form.js' %}"></script>
 {% endblock %}
 {% endblock %}

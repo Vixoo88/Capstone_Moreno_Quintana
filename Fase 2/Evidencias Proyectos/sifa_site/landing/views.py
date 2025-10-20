@@ -1,27 +1,41 @@
+# landing/views.py
 from collections import defaultdict
 from calendar import monthrange
 from datetime import datetime, time as dtime
 
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q, Prefetch, F
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-
 from django.views.decorators.http import require_POST
-from django.contrib.auth import logout
+from django.core.cache import cache
+from .notifications import send_telegram_message
+
 
 from .models import (
-    Administracion, HoraProgramada, OrdenMedicamento, Receta, Residente
+    Administracion, HoraProgramada, OrdenMedicamento, Receta, Residente, Producto
 )
 from .forms import (
     AdminMarcarForm, OrdenMedicamentoForm, ProductoQuickForm,
     RecetaForm, ResidenteForm
 )
 
-# --------------------- Helpers ---------------------
+# --------- imports opcionales para APIs externas ---------
+try:
+    import requests  # usado por CIMA/RxNorm; si falta, la API externa se omite
+except Exception:
+    requests = None
+
+
+# =========================================================
+# Helpers
+# =========================================================
 
 def _parse_horas_from_post(request):
     """Lee name='hora[]' y name='dia[]' y devuelve [{'hora': dtime, 'dia': int|None}, ...]."""
@@ -78,8 +92,39 @@ def _ajustar_stock_por_transicion(evento, old, new):
         orden.stock_asignado += 1
         orden.save(update_fields=['stock_asignado'])
 
+    _check_alerta_stock(orden)
 
-# ---------------- Landing / Dashboard ----------------
+def _check_alerta_stock(orden):
+    """
+    Si stock_asignado <= stock_critico y no se ha avisado, envía Telegram y marca alerta_enviada=True.
+    Si sale de crítico (> stock_critico) y estaba marcada, resetea alerta_enviada=False.
+    """
+    try:
+        critico = (orden.stock_asignado or 0) <= (orden.stock_critico or 0)
+        if critico and not orden.alerta_enviada:
+            res = orden.receta.residente
+            msg = (
+                "⚠️ <b>Stock crítico</b>\n"
+                f"👤 Residente: {res.nombre_completo}\n"
+                f"💊 Medicamento: {orden.producto} · {orden.dosis}\n"
+                f"📦 Stock: {orden.stock_asignado} (crítico {orden.stock_critico})"
+            )
+            ok = send_telegram_message(msg)
+            if ok:
+                orden.alerta_enviada = True
+                orden.save(update_fields=['alerta_enviada'])
+        elif not critico and orden.alerta_enviada:
+            # se repone → listo para volver a avisar la próxima vez
+            orden.alerta_enviada = False
+            orden.save(update_fields=['alerta_enviada'])
+    except Exception:
+        # No romper el flujo si hay un problema de red
+        pass
+
+
+# =========================================================
+# Público / Auth / Dashboard
+# =========================================================
 
 def home_public(request):
     if request.user.is_authenticated:
@@ -115,6 +160,7 @@ def orden_restock(request, orden_id):
         if sumar > 0:
             orden.stock_asignado = (orden.stock_asignado or 0) + sumar
             orden.save(update_fields=['stock_asignado'])
+            _check_alerta_stock(orden)
             messages.success(request, f'Se añadieron {sumar} al stock de {orden}.')
         else:
             messages.error(request, 'Cantidad inválida.')
@@ -126,7 +172,10 @@ def logout_view(request):
     messages.success(request, "Sesión cerrada. ¡Hasta luego!")
     return redirect('home_public')
 
-# ------------------- Residentes -------------------
+
+# =========================================================
+# Residentes
+# =========================================================
 
 @login_required
 def residente_list(request):
@@ -162,8 +211,38 @@ def residente_detail(request, residente_id):
     )
     return render(request, 'landing/residente_detail.html', {'residente': res})
 
+@login_required
+@transaction.atomic
+def residente_delete(request, residente_id):
+    """
+    Elimina al residente y todo su historial en orden seguro (evita ProtectedError):
+    1) Administraciones del residente
+    2) Recetas del residente (borra órdenes y horas por CASCADE)
+    3) Residente
+    """
+    residente = get_object_or_404(Residente, pk=residente_id)
 
-# ------------------- Recetas / Órdenes -------------------
+    if request.method == 'POST':
+        nombre = residente.nombre_completo
+        Administracion.objects.filter(residente=residente).delete()
+        Receta.objects.filter(residente=residente).delete()
+        residente.delete()
+        messages.success(request, f'Se eliminó a "{nombre}" y todo su historial.')
+        return redirect('residente_list')
+
+    return render(request, 'landing/confirm_delete.html', {
+        'titulo': 'Eliminar residente',
+        'detalle': f'Se eliminará al residente "{residente.nombre_completo}" y todo su historial '
+                   '(recetas, medicamentos, horas y registros de administración).',
+        'post_url': request.path,
+        'volver_url': 'residente_detail',
+        'volver_args': [residente.id],
+    })
+
+
+# =========================================================
+# Recetas / Órdenes
+# =========================================================
 
 @login_required
 @transaction.atomic
@@ -197,6 +276,8 @@ def receta_create(request, residente_id):
             orden.receta = receta
             orden.producto = producto
             orden.save()
+            _check_alerta_stock(orden)
+
 
             for item in horas_data:
                 HoraProgramada.objects.create(
@@ -261,6 +342,7 @@ def orden_create(request, receta_id):
             orden.receta = receta
             orden.producto = producto
             orden.save()
+            _check_alerta_stock(orden)
 
             for item in horas_data:
                 HoraProgramada.objects.create(
@@ -348,7 +430,9 @@ def orden_delete(request, orden_id):
     })
 
 
-# ------------------- Administración HOY -------------------
+# =========================================================
+# Administración (Hoy)
+# =========================================================
 
 def _generar_eventos_hoy():
     """Genera registros PENDIENTE para hoy (hora local) según recetas activas."""
@@ -483,7 +567,9 @@ def admin_marcar(request, admin_id):
     return render(request, 'landing/admin_marcar.html', {'evento': evento, 'form': form})
 
 
-# ------------------- Registro mensual -------------------
+# =========================================================
+# Registro mensual
+# =========================================================
 
 @login_required
 def registro_mensual(request, residente_id):
@@ -546,37 +632,177 @@ def registro_mensual(request, residente_id):
         'rows': rows
     })
 
+
+# =========================================================
+# API Sugerencias de Medicamentos (Local + Externas opcionales)
+# =========================================================
+
+def _suggest_local(q, limit):
+    qs = (Producto.objects
+          .filter(Q(nombre__icontains=q) | Q(potencia__icontains=q))
+          .order_by('nombre', 'potencia')[:limit])
+    return [{
+        "id": p.id,
+        "label": f"{p.nombre} {p.potencia}".strip(),
+        "source": "local",
+        "nombre": p.nombre,
+        "potencia": p.potencia or "",
+        "forma": p.forma or "",
+    } for p in qs]
+
+# ---------- Proveedor: CIMA (AEMPS, ES) ----------
+def _suggest_cima(q, limit, timeout):
+    """
+    Usa /medicamentos?nombre=<q> (paginado). Si no hay resultados,
+    intenta /vmpp?nombre=<q> como fallback.
+    """
+    if not requests:
+        return []
+
+    headers = {"Accept": "application/json"}
+
+    # 1) /medicamentos?nombre=...  (¡OJO: plural!)
+    try:
+        r = requests.get(
+            "https://cima.aemps.es/cima/rest/medicamentos",
+            params={"nombre": q, "autorizados": 1, "pagina": 1},
+            timeout=timeout,
+            headers=headers,
+        )
+        items = []
+        if r.status_code == 200:
+            data = r.json() or []
+            # a veces viene como dict con 'resultados', otras como lista
+            if isinstance(data, dict):
+                items = data.get("resultados", []) or []
+            elif isinstance(data, list):
+                items = data
+
+        out, seen = [], set()
+        for it in items:
+            # en este listado suelen venir 'nombre' y 'nregistro'
+            nombre = (it.get("nombre") or "").strip()
+            nreg   = it.get("nregistro") or ""
+            if not nombre or nombre in seen:
+                continue
+            seen.add(nombre)
+            out.append({
+                "id": f"cima:{nreg}",
+                "label": nombre,
+                "source": "cima",
+                "nombre": nombre,
+                "potencia": "",
+                "forma": "",
+            })
+            if len(out) >= limit:
+                return out
+        if out:
+            return out
+    except Exception:
+        pass
+
+    # 2) /vmpp?nombre=... (fallback por descripción clínica)
+    try:
+        r2 = requests.get(
+            "https://cima.aemps.es/cima/rest/vmpp",
+            params={"nombre": q, "pagina": 1},
+            timeout=timeout,
+            headers=headers,
+        )
+        if r2.status_code != 200:
+            return []
+        data2 = r2.json() or []
+        items2 = data2.get("resultados", []) if isinstance(data2, dict) else data2
+        out2, seen2 = [], set()
+        for it in items2:
+            nombre = (it.get("vmppDesc") or it.get("vmpDesc") or it.get("nombre") or "").strip()
+            _id    = it.get("id") or it.get("vmpp") or it.get("vmp") or ""
+            if not nombre or nombre in seen2:
+                continue
+            seen2.add(nombre)
+            out2.append({
+                "id": f"cima-vmpp:{_id}",
+                "label": nombre,
+                "source": "cima",
+                "nombre": nombre,
+                "potencia": "",
+                "forma": "",
+            })
+            if len(out2) >= limit:
+                break
+        return out2
+    except Exception:
+        return []
+
+
+
+def _suggest_rxnorm(q, limit, timeout):
+    if not requests:
+        return []
+    # RxNorm: /REST/drugs.json?name=<q>
+    url = "https://rxnav.nlm.nih.gov/REST/drugs.json"
+    try:
+        r = requests.get(url, params={"name": q}, timeout=timeout, headers={"Accept": "application/json"})
+        if r.status_code != 200:
+            return []
+        data = r.json() or {}
+        props = []
+        for group in (data.get("drugGroup", {}) or {}).get("conceptGroup", []) or []:
+            props += group.get("conceptProperties", []) or []
+        seen, out = set(), []
+        for p in props:
+            label = p.get("name")
+            rxcui = p.get("rxcui")
+            if not label or label in seen:
+                continue
+            seen.add(label)
+            out.append({
+                "id": f"rxnorm:{rxcui}",
+                "label": label,
+                "source": "rxnorm",
+                "nombre": label,
+                "potencia": "",
+                "forma": "",
+            })
+            if len(out) >= limit:
+                break
+        return out
+    except Exception:
+        return []
+
 @login_required
-@transaction.atomic
-def residente_delete(request, residente_id):
+def api_productos_suggest(request):
     """
-    Elimina al residente y todo su historial en un orden seguro para evitar ProtectedError.
-    1) Administraciones del residente
-    2) Recetas del residente (borra órdenes y horas por CASCADE)
-    3) Residente
+    Sugerencias de medicamentos:
+    - LOCAL: busca en Producto
+    - CIMA: AEMPS (ES) por nombre
+    - RXNORM: NIH por nombre
+    - HYBRID: combina (Local primero, luego externos)
+    Forzar proveedor con ?provider=LOCAL|CIMA|RXNORM|HYBRID
     """
-    residente = get_object_or_404(Residente, pk=residente_id)
+    q = (request.GET.get('q') or '').strip()
+    if not q:
+        return JsonResponse({"results": []})
 
-    if request.method == 'POST':
-        nombre = residente.nombre_completo
+    provider = request.GET.get("provider") or getattr(settings, "DRUG_SUGGEST_PROVIDER", "HYBRID")
+    limit    = int(getattr(settings, "DRUG_SUGGEST_LIMIT", 10))
+    timeout  = int(getattr(settings, "DRUG_SUGGEST_TIMEOUT", 2))
 
-        # 1) Administraciones (PROTECT sobre orden/residente → hay que borrarlas primero)
-        Administracion.objects.filter(residente=residente).delete()
+    results, labels = [], set()
 
-        # 2) Recetas (tienen FK a residente con PROTECT, así que hay que borrarlas antes de borrar al residente)
-        Receta.objects.filter(residente=residente).delete()
+    def add(items):
+        for it in items:
+            if it["label"] not in labels:
+                labels.add(it["label"])
+                results.append(it)
+                if len(results) >= limit:
+                    break
 
-        # 3) Finalmente el residente
-        residente.delete()
+    if provider in ("LOCAL", "HYBRID"):
+        add(_suggest_local(q, limit))
+    if len(results) < limit and provider in ("CIMA", "HYBRID"):
+        add(_suggest_cima(q, limit, timeout))
+    if len(results) < limit and provider in ("RXNORM", "HYBRID"):
+        add(_suggest_rxnorm(q, limit, timeout))
 
-        messages.success(request, f'Se eliminó a "{nombre}" y todo su historial.')
-        return redirect('residente_list')
-
-    return render(request, 'landing/confirm_delete.html', {
-        'titulo': 'Eliminar residente',
-        'detalle': f'Se eliminará al residente "{residente.nombre_completo}" y todo su historial '
-                   '(recetas, medicamentos, horas y registros de administración).',
-        'post_url': request.path,
-        'volver_url': 'residente_detail',
-        'volver_args': [residente.id],
-    })
+    return JsonResponse({"results": results})

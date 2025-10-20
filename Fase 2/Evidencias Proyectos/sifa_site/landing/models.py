@@ -56,6 +56,8 @@ class OrdenMedicamento(models.Model):
     stock_asignado = models.PositiveIntegerField(default=0)  # stock actual
     stock_critico = models.PositiveIntegerField(default=0)
 
+    alerta_enviada = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.producto} · {self.dosis}"
 

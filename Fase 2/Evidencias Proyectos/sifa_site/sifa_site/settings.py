@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -140,3 +141,12 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'   # a dónde ir después de entrar
 LOGOUT_REDIRECT_URL = 'home'
 
+# Autocomplete de medicamentos
+DRUG_SUGGEST_PROVIDER = "HYBRID"   # "LOCAL" | "CIMA" | "RXNORM" | "HYBRID"
+DRUG_SUGGEST_LIMIT = 10            # tope de sugerencias
+DRUG_SUGGEST_TIMEOUT = 4           # segundos de timeout para APIs externas
+
+# settings.py
+TELEGRAM_BOT_TOKEN = "8455400576:AAFsXnUvLKSNbe4sHKVj7JllDIEQaVoVeqQ"  # tu token exacto, SIN el prefijo "bot"
+TELEGRAM_CHAT_ID   = "2091874703"  # <- aquí pondrás el número que obtengas abajo
+   # tu chat_id (usuario o grupo)

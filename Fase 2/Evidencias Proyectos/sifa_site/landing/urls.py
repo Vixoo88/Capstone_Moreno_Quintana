@@ -28,4 +28,7 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(next_page="home_public"), name="logout"),
 
     path('residentes/<int:residente_id>/eliminar/', views.residente_delete, name='residente_delete'),
+
+    path('api/productos/suggest/', views.api_productos_suggest, name='api_productos_suggest'),
+
 ]
