@@ -146,7 +146,5 @@ DRUG_SUGGEST_PROVIDER = "HYBRID"   # "LOCAL" | "CIMA" | "RXNORM" | "HYBRID"
 DRUG_SUGGEST_LIMIT = 10            # tope de sugerencias
 DRUG_SUGGEST_TIMEOUT = 4           # segundos de timeout para APIs externas
 
-# settings.py
-TELEGRAM_BOT_TOKEN = "8455400576:AAFsXnUvLKSNbe4sHKVj7JllDIEQaVoVeqQ"  # tu token exacto, SIN el prefijo "bot"
-TELEGRAM_CHAT_ID   = "2091874703"  # <- aquí pondrás el número que obtengas abajo
-   # tu chat_id (usuario o grupo)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8455400576:AAFsXnUvLKSNbe4sHKVj7JllDIEQaVoVeqQ")
+TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "2091874703") 

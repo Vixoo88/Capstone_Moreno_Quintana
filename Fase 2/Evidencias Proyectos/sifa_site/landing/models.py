@@ -108,3 +108,4 @@ class Administracion(models.Model):
 
     def __str__(self):
         return f"{self.residente} · {self.orden} · {self.programada_para:%Y-%m-%d %H:%M}"
+

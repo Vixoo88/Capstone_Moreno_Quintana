@@ -1,0 +1,41 @@
+:root{
+  --brand-1:#0ea5e9;   /* cyan */
+  --brand-2:#2563eb;   /* blue */
+  --brand-3:#7c3aed;   /* violet */
+}
+html,body{height:100%;}
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -20%, rgba(14,165,233,.25), rgba(14,165,233,0)),
+    radial-gradient(1200px 600px at 110% -10%, rgba(124,58,237,.25), rgba(124,58,237,0)),
+    linear-gradient(180deg, #f8fafc 0, #eef2ff 100%);
+  background-attachment: fixed;
+}
+.nav-brand{
+  font-weight:800; letter-spacing:.2px;
+  background: linear-gradient(90deg,var(--brand-1),var(--brand-2),var(--brand-3));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.glass-card{
+  background: rgba(255,255,255,.8);
+  border: 1px solid rgba(255,255,255,.6);
+  box-shadow: 0 8px 24px rgba(16,24,40,.06);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
+}
+.shadow-soft{ box-shadow: 0 10px 25px rgba(2,8,23,.08); }
+.chip{
+  border:1px solid rgba(2,8,23,.12);
+  border-radius:999px; padding:.35rem .85rem; font-weight:600; font-size:.875rem;
+}
+.chip.active{ background:linear-gradient(90deg,var(--brand-1),var(--brand-2)); color:#fff; border-color:transparent; }
+.page-title{ font-weight:800; letter-spacing:.2px;}
+.table-sticky thead th{ position:sticky; top:0; background:#fff; z-index:2; }
+.badge-status{font-weight:600}
+.btn-gradient{
+  background: linear-gradient(90deg,var(--brand-1),var(--brand-2));
+  color:#fff; border:0;
+}
+.btn-gradient:hover{ filter:brightness(.95); color:#fff; }
+.footer-small{color:#64748b}

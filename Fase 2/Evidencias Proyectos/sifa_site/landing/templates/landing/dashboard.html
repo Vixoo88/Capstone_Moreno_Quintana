@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
+{% load roles_tags %}
 {% block content %}
 <div class="container py-4">
   <h2 class="page-title mb-4">Panel</h2>
 
   <div class="row g-4">
+    <!-- Tarjeta: Administraciones de hoy -->
     <div class="col-lg-4">
       <div class="glass-card p-4 h-100">
         <div class="d-flex align-items-center justify-content-between">
@@ -19,6 +21,7 @@
       </div>
     </div>
 
+    <!-- Tarjeta: Alertas de stock crítico -->
     <div class="col-lg-8">
       <div class="glass-card p-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -26,20 +29,47 @@
           {% if criticos %}<span class="badge bg-danger">{{ criticos|length }}</span>{% endif %}
         </div>
 
+        {# Aviso solo para cuidadoras: lectura sin acciones #}
+        {% if request.user|is_cuidadora and criticos %}
+          <div class="alert alert-warning py-2 mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Si ves una alerta, avisa a una enfermera para reponer stock.
+          </div>
+        {% endif %}
+
         {% if criticos %}
           <div class="list-group list-group-flush">
             {% for o in criticos %}
               <div class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
                   <div class="fw-semibold">{{ o.receta.residente.nombre_completo }}</div>
-                  <div class="text-muted small">{{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}</div>
-                  <div class="small">Stock: <span class="fw-bold">{{ o.stock_asignado }}</span> · Crítico: {{ o.stock_critico }}</div>
+                  <div class="text-muted small">
+                    {{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}
+                  </div>
+                  <div class="small">
+                    Stock: <span class="fw-bold">{{ o.stock_asignado }}</span>
+                    · Crítico: {{ o.stock_critico }}
+                  </div>
                 </div>
-                <form method="post" action="{% url 'orden_restock' o.id %}" class="d-flex align-items-center gap-2">
-                  {% csrf_token %}
-                  <input type="number" name="sumar" min="1" class="form-control form-control-sm" placeholder="+ unidades" style="width:120px">
-                  <button class="btn btn-sm btn-success"><i class="bi bi-plus-circle me-1"></i>Reponer</button>
-                </form>
+
+                {# Acciones: solo Admin puede reponer #}
+                {% if request.user|is_admin %}
+                  <form method="post" action="{% url 'orden_restock' o.id %}" class="d-flex align-items-center gap-2">
+                    {% csrf_token %}
+                    <input type="number" name="sumar" min="1" class="form-control form-control-sm"
+                           placeholder="+ unidades" style="width:120px">
+                    <button class="btn btn-sm btn-success">
+                      <i class="bi bi-plus-circle me-1"></i>Reponer
+                    </button>
+                  </form>
+                {% else %}
+                  <div class="d-flex flex-column align-items-end text-end">
+                    <span class="badge bg-danger-subtle text-danger border border-danger small">
+                      <i class="bi bi-exclamation-octagon me-1"></i>Stock crítico
+                    </span>
+                    <small class="text-muted mt-1">Contactar a una enfermera para reponer</small>
+                  </div>
+                {% endif %}
               </div>
             {% endfor %}
           </div>

@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.core.cache import cache
 from .notifications import send_telegram_message
+from .roles import admin_required, cuidadora_or_admin_required
 
 
 from .models import (
@@ -132,6 +133,7 @@ def home_public(request):
     return render(request, 'landing/home.html')
 
 @login_required
+@cuidadora_or_admin_required
 def dashboard(request):
     hoy = timezone.localdate()
     admins_hoy = Administracion.objects.filter(programada_para__date=hoy).count()
@@ -150,6 +152,7 @@ def dashboard(request):
     })
 
 @login_required
+@admin_required
 def orden_restock(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento, pk=orden_id)
     if request.method == 'POST':
@@ -178,11 +181,13 @@ def logout_view(request):
 # =========================================================
 
 @login_required
+@admin_required
 def residente_list(request):
     qs = Residente.objects.filter(activo=True).order_by('nombre_completo')
     return render(request, 'landing/residentes_list.html', {'residentes': qs})
 
 @login_required
+@admin_required
 def residente_create(request):
     form = ResidenteForm(request.POST or None)
     if request.method == 'POST':
@@ -194,6 +199,7 @@ def residente_create(request):
     return render(request, 'landing/residente_form.html', {'form': form})
 
 @login_required
+@admin_required
 def residente_detail(request, residente_id):
     res = get_object_or_404(
         Residente.objects.prefetch_related(
@@ -213,6 +219,7 @@ def residente_detail(request, residente_id):
 
 @login_required
 @transaction.atomic
+@admin_required
 def residente_delete(request, residente_id):
     """
     Elimina al residente y todo su historial en orden seguro (evita ProtectedError):
@@ -246,6 +253,7 @@ def residente_delete(request, residente_id):
 
 @login_required
 @transaction.atomic
+@admin_required
 def receta_create(request, residente_id):
     res = get_object_or_404(Residente, pk=residente_id)
     receta_form = RecetaForm(request.POST or None)
@@ -301,6 +309,7 @@ def receta_create(request, residente_id):
     })
 
 @login_required
+@admin_required
 def receta_delete(request, receta_id):
     receta = get_object_or_404(Receta, pk=receta_id)
     res_id = receta.residente_id
@@ -319,6 +328,7 @@ def receta_delete(request, receta_id):
 
 @login_required
 @transaction.atomic
+@admin_required
 def orden_create(request, receta_id):
     receta = get_object_or_404(Receta, pk=receta_id)
     orden_form = OrdenMedicamentoForm(request.POST or None)
@@ -366,6 +376,7 @@ def orden_create(request, receta_id):
 
 @login_required
 @transaction.atomic
+@admin_required
 def orden_edit(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento.objects.select_related('receta', 'producto'), pk=orden_id)
     orden_form = OrdenMedicamentoForm(request.POST or None, instance=orden)
@@ -414,6 +425,7 @@ def orden_edit(request, orden_id):
     })
 
 @login_required
+@admin_required
 def orden_delete(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento, pk=orden_id)
     res_id = orden.receta.residente_id
@@ -461,6 +473,7 @@ def _generar_eventos_hoy():
             )
 
 @login_required
+@cuidadora_or_admin_required
 def admin_list_hoy(request):
     """Listado con chips por hora; permite filtrar por ?h=HH:MM."""
     _generar_eventos_hoy()
@@ -499,6 +512,7 @@ def admin_list_hoy(request):
     })
 
 @login_required
+@cuidadora_or_admin_required
 def admin_marcar_rapido(request, admin_id):
     """Marca una administración con un clic y ajusta stock."""
     if request.method != 'POST':
@@ -520,6 +534,7 @@ def admin_marcar_rapido(request, admin_id):
     return redirect(url)
 
 @login_required
+@cuidadora_or_admin_required
 def admin_marcar_grupo(request):
     """Marca todos los eventos de una hora (hoy) con el mismo estado; ajusta stock."""
     if request.method != 'POST':
@@ -552,6 +567,7 @@ def admin_marcar_grupo(request):
     return redirect(reverse('admin_list_hoy') + f'?h={hora}')
 
 @login_required
+@cuidadora_or_admin_required
 def admin_marcar(request, admin_id):
     """Página de marcado detallado (opcional)."""
     evento = get_object_or_404(Administracion, pk=admin_id)
@@ -572,6 +588,7 @@ def admin_marcar(request, admin_id):
 # =========================================================
 
 @login_required
+@admin_required
 def registro_mensual(request, residente_id):
     """
     Una fila por (orden, hora local). En cada celda:

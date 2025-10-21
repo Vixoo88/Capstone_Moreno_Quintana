@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5">
+  <div class="alert alert-warning glass-card">
+    <h4 class="mb-2">Permiso denegado</h4>
+    <p>No tienes permisos para acceder a esta página.</p>
+    <a class="btn btn-primary mt-2" href="{% url 'admin_list_hoy' %}">Ir al checklist</a>
+  </div>
+</div>
+{% endblock %}
