@@ -24,11 +24,8 @@ from .models import Asignacion, DiaAsignacion
 from .roles import (
     admin_required, cuidadora_or_admin_required, tens_or_admin_required, staff_view_required,
     is_cuidadora, is_tens, is_admin,
-    CUIDADORA_GROUP,        
+    CUIDADORA_GROUP,
 )
-
-
-
 
 from .models import (
     Administracion, HoraProgramada, OrdenMedicamento, Receta, Residente, Producto
@@ -195,7 +192,7 @@ def logout_view(request):
 @tens_or_admin_required
 def residente_list(request):
     qs = Residente.objects.filter(activo=True).order_by('nombre_completo')
-    return render(request, 'landing/residentes_list.html', {'residentes': qs})
+    return render(request, 'residentes/residentes_list.html', {'residentes': qs})
 
 @login_required
 @admin_required
@@ -207,7 +204,7 @@ def residente_create(request):
             messages.success(request, 'Residente creado. Ahora registra una receta.')
             return redirect('receta_create', residente_id=r.id)
         messages.error(request, 'No se pudo guardar el residente. Revisa los campos.')
-    return render(request, 'landing/residente_form.html', {'form': form})
+    return render(request, 'residentes/residente_form.html', {'form': form})
 
 @login_required
 @admin_required
@@ -226,7 +223,7 @@ def residente_detail(request, residente_id):
         ),
         pk=residente_id
     )
-    return render(request, 'landing/residente_detail.html', {'residente': res})
+    return render(request, 'residentes/residente_detail.html', {'residente': res})
 
 @login_required
 @transaction.atomic
@@ -248,7 +245,7 @@ def residente_delete(request, residente_id):
         messages.success(request, f'Se eliminó a "{nombre}" y todo su historial.')
         return redirect('residente_list')
 
-    return render(request, 'landing/confirm_delete.html', {
+    return render(request, 'residentes/confirm_delete.html', {
         'titulo': 'Eliminar residente',
         'detalle': f'Se eliminará al residente "{residente.nombre_completo}" y todo su historial '
                    '(recetas, medicamentos, horas y registros de administración).',
@@ -297,7 +294,6 @@ def receta_create(request, residente_id):
             orden.save()
             _check_alerta_stock(orden)
 
-
             for item in horas_data:
                 HoraProgramada.objects.create(
                     orden=orden, hora=item['hora'], dia_semana=item['dia']
@@ -308,7 +304,7 @@ def receta_create(request, residente_id):
 
         messages.error(request, 'No se pudo guardar la receta. Revisa los errores.')
 
-    return render(request, 'landing/receta_form.html', {
+    return render(request, 'recetas/receta_form.html', {
         'residente': res,
         'receta_form': receta_form,
         'orden_form': orden_form,
@@ -329,7 +325,7 @@ def receta_delete(request, receta_id):
         messages.success(request, 'Receta eliminada.')
         return redirect('residente_detail', residente_id=res_id)
 
-    return render(request, 'landing/confirm_delete.html', {
+    return render(request, 'residentes/confirm_delete.html', {
         'titulo': 'Eliminar receta',
         'detalle': f'Receta #{receta.id} del residente {receta.residente}',
         'post_url': request.path,
@@ -375,7 +371,7 @@ def orden_create(request, receta_id):
 
         messages.error(request, 'No se pudo agregar el medicamento. Revisa los errores.')
 
-    return render(request, 'landing/orden_form.html', {
+    return render(request, 'ordenes/orden_form.html', {
         'receta': receta,
         'orden_form': orden_form,
         'producto_form': producto_form,
@@ -424,7 +420,7 @@ def orden_edit(request, orden_id):
 
         messages.error(request, 'No se pudo guardar cambios. Revisa los errores.')
 
-    return render(request, 'landing/orden_form.html', {
+    return render(request, 'ordenes/orden_form.html', {
         'receta': orden.receta,
         'orden': orden,
         'orden_form': orden_form,
@@ -444,7 +440,7 @@ def orden_delete(request, orden_id):
         orden.delete()
         messages.success(request, 'Medicamento eliminado.')
         return redirect('residente_detail', residente_id=res_id)
-    return render(request, 'landing/confirm_delete.html', {
+    return render(request, 'residentes/confirm_delete.html', {
         'titulo': 'Eliminar medicamento',
         'detalle': f'{orden.producto} — {orden.dosis}',
         'post_url': request.path,
@@ -522,13 +518,12 @@ def admin_list_hoy(request):
 
     horas = [(h, counts[h]) for h in horas_sorted]
 
-    return render(request, 'landing/admin_hoy.html', {
+    return render(request, 'administracion/admin_hoy.html', {
         'grupos': grupos,
         'hoy': hoy,
         'horas': horas,
         'seleccion': selected,
     })
-
 
 @login_required
 @cuidadora_or_admin_required
@@ -599,7 +594,7 @@ def admin_marcar(request, admin_id):
         _ajustar_stock_por_transicion(e, old, e.estado)
         messages.success(request, 'Registro actualizado.')
         return redirect('admin_list_hoy')
-    return render(request, 'landing/admin_marcar.html', {'evento': evento, 'form': form})
+    return render(request, 'administracion/admin_marcar.html', {'evento': evento, 'form': form})
 
 
 # =========================================================
@@ -660,7 +655,7 @@ def registro_mensual(request, residente_id):
 
     rows = [v for _, v in sorted(rows_map.items(), key=sort_key)]
 
-    return render(request, 'landing/registro_mensual.html', {
+    return render(request, 'residentes/registro_mensual.html', {
         'residente': res,
         'year': y,
         'month': m,
@@ -770,8 +765,6 @@ def _suggest_cima(q, limit, timeout):
     except Exception:
         return []
 
-
-
 def _suggest_rxnorm(q, limit, timeout):
     if not requests:
         return []
@@ -869,14 +862,13 @@ def asignaciones_hoy(request):
     for a in asignaciones:
         grupos.setdefault(a.cuidadora, []).append(a.residente)
 
-    return render(request, 'landing/asignaciones_hoy.html', {
+    return render(request, 'asignaciones/asignaciones_hoy.html', {
         'fecha': hoy,
         'cuidadoras': cuidadoras,
         'seleccion_ids': seleccion_ids,  # para checkboxes
         'grupos': grupos,
         'solo_asignados': modo.solo_asignados,
     })
-
 
 @login_required
 @require_http_methods(["POST"])
@@ -925,7 +917,6 @@ def asignaciones_generar(request):
 
     messages.success(request, f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} cuidadoras.")
     return redirect('asignaciones_hoy')
-
 
 @login_required
 @require_http_methods(["POST"])

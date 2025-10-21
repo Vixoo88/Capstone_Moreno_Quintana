@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load roles_tags %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+  <div class="glass-card p-4">
+    <h3 class="page-title mb-3 d-flex align-items-center gap-2 flex-wrap">
+      <i class="bi bi-person-gear"></i>
+      <span>Asignar cuidadores — {{ fecha|date:"d/m/Y" }}</span>
+    </h3>
+
+    <div class="row g-3">
+      <!-- Columna izquierda: selección y acciones -->
+      <div class="col-12 col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="d-flex align-items-center gap-1">
+              <i class="bi bi-people"></i>
+              <span>Seleccionar cuidadoras</span>
+            </span>
+            <div class="btn-group btn-group-sm flex-wrap" role="group">
+              <button class="btn btn-outline-secondary" type="button" id="btnSelTodas">Todas</button>
+              <button class="btn btn-outline-secondary" type="button" id="btnSelNinguna">Ninguna</button>
+            </div>
+          </div>
+
+          <!-- Lista con scroll; las acciones quedan sticky al fondo -->
+          <div class="card-body card-scroll d-flex flex-column">
+            <form method="post" action="{% url 'asignaciones_generar' %}" id="formGenerar" class="flex-grow-1">
+              {% csrf_token %}
+              {% if cuidadoras %}
+                {% for c in cuidadoras %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input cuidadora-check" type="checkbox"
+                           name="cuidadores" id="c_{{ c.id }}" value="{{ c.id }}"
+                           {% if c.id in seleccion_ids %}checked{% endif %}>
+                    <label class="form-check-label d-flex justify-content-between w-100 gap-2" for="c_{{ c.id }}">
+                      <span class="text-truncate">{{ c.get_full_name|default:c.username }}</span>
+                      <span class="text-muted small d-none d-sm-inline">({{ c.username }})</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="text-muted">No hay cuidadoras activas.</div>
+              {% endif %}
+
+              <hr class="my-3">
+
+              <button class="btn btn-gradient w-100 mb-2">
+                <i class="bi bi-shuffle me-1"></i>Generar asignación equitativa
+              </button>
+              <div class="form-text small mb-3">
+                Si no seleccionas ninguna, se usarán <b>todas</b> las cuidadoras activas por defecto.
+              </div>
+            </form>
+
+            <!-- ACCIONES STICKY: siempre visibles en móvil -->
+            <div class="sticky-actions d-flex flex-column flex-sm-row gap-2">
+              <form method="post" action="{% url 'asignaciones_toggle_modo' %}" class="flex-fill">
+                {% csrf_token %}
+                <input type="hidden" name="solo_asignados" value="{{ solo_asignados|yesno:'0,1' }}">
+                <button class="btn btn-outline-secondary w-100"
+                        onclick="this.previousElementSibling.value='{{ solo_asignados|yesno:'1,0' }}'">
+                  {% if solo_asignados %}
+                    <i class="bi bi-people me-1"></i>Ver TODOS (quitar restricción)
+                  {% else %}
+                    <i class="bi bi-person-check me-1"></i>Solo ASIGNADOS (restringir)
+                  {% endif %}
+                </button>
+              </form>
+
+              <form method="post" action="{% url 'asignaciones_limpiar' %}" class="flex-fill">
+                {% csrf_token %}
+                <button class="btn btn-outline-danger w-100">
+                  <i class="bi bi-x-circle me-1"></i>Quitar asignaciones
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: resumen actual -->
+      <div class="col-12 col-md-7">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-semibold d-flex align-items-center gap-2">
+            <i class="bi bi-list-check"></i>
+            <span>Asignaciones de hoy</span>
+            <span class="badge bg-secondary ms-auto">{{ grupos|length }} cuidadora(s)</span>
+          </div>
+
+          <div class="card-body">
+            {% if grupos %}
+              <div class="row row-cols-1 row-cols-md-2 g-3">
+                {% for cuid, lista in grupos.items %}
+                  <div class="col">
+                    <div class="border rounded-3 p-2 h-100">
+                      <div class="fw-semibold mb-2 d-flex align-items-center gap-1">
+                        <i class="bi bi-person-heart"></i>
+                        <span class="text-truncate">{{ cuid.get_full_name|default:cuid.username }}</span>
+                      </div>
+
+                      {% if lista %}
+                        <ul class="list-unstyled small mb-0 list-compact">
+                          {% for r in lista %}
+                            <li class="py-1 d-flex justify-content-between align-items-center border-bottom">
+                              <span class="me-2 text-truncate">{{ r.nombre_completo }}</span>
+                              <span class="text-muted ms-2 d-none d-sm-inline">{{ r.rut }}</span>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      {% else %}
+                        <div class="text-muted small">Sin residentes asignados.</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-info mb-0">Aún no hay asignaciones hoy.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_css %}
+<style>
+  /* Lista con scroll; en móvil más corta */
+  @media (max-width: 576.98px) {
+    .glass-card { padding: 1rem !important; }
+    .card-scroll { max-height: 60vh; overflow: auto; }
+    .list-compact li { padding-top: .4rem; padding-bottom: .4rem; }
+  }
+  @media (min-width: 577px) {
+    .card-scroll { max-height: 480px; overflow: auto; }
+  }
+
+  /* Acciones pegadas al fondo de la tarjeta de la izquierda */
+  .sticky-actions{
+    position: sticky;
+    bottom: 0;
+    background: var(--bs-body-bg, #fff);
+    padding-top: .75rem;
+    margin-top: .25rem;
+    border-top: 1px solid rgba(0,0,0,.06);
+    z-index: 1;
+  }
+
+  /* Truncado de textos largos para que no rompan el layout */
+  .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function(){
+    const todasBtn = document.getElementById('btnSelTodas');
+    const ningunaBtn = document.getElementById('btnSelNinguna');
+    const checks = () => Array.from(document.querySelectorAll('.cuidadora-check'));
+
+    if (todasBtn) todasBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = true));
+    if (ningunaBtn) ningunaBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = false));
+  })();
+</script>
+{% endblock %}
+{% endblock %}
