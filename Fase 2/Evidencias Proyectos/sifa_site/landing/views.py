@@ -16,7 +16,18 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.core.cache import cache
 from .notifications import send_telegram_message
-from .roles import admin_required, cuidadora_or_admin_required
+import random
+from django.contrib.auth.models import User
+from django.views.decorators.http import require_http_methods
+from .models import Asignacion, DiaAsignacion
+# arriba en views.py
+from .roles import (
+    admin_required, cuidadora_or_admin_required, tens_or_admin_required, staff_view_required,
+    is_cuidadora, is_tens, is_admin,
+    CUIDADORA_GROUP,        
+)
+
+
 
 
 from .models import (
@@ -133,7 +144,7 @@ def home_public(request):
     return render(request, 'landing/home.html')
 
 @login_required
-@cuidadora_or_admin_required
+@staff_view_required
 def dashboard(request):
     hoy = timezone.localdate()
     admins_hoy = Administracion.objects.filter(programada_para__date=hoy).count()
@@ -152,7 +163,7 @@ def dashboard(request):
     })
 
 @login_required
-@admin_required
+@tens_or_admin_required
 def orden_restock(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento, pk=orden_id)
     if request.method == 'POST':
@@ -181,7 +192,7 @@ def logout_view(request):
 # =========================================================
 
 @login_required
-@admin_required
+@tens_or_admin_required
 def residente_list(request):
     qs = Residente.objects.filter(activo=True).order_by('nombre_completo')
     return render(request, 'landing/residentes_list.html', {'residentes': qs})
@@ -473,9 +484,8 @@ def _generar_eventos_hoy():
             )
 
 @login_required
-@cuidadora_or_admin_required
+@staff_view_required
 def admin_list_hoy(request):
-    """Listado con chips por hora; permite filtrar por ?h=HH:MM."""
     _generar_eventos_hoy()
     hoy = timezone.localdate()
 
@@ -484,6 +494,14 @@ def admin_list_hoy(request):
         .filter(programada_para__date=hoy)
     )
 
+    # Modo del día
+    modo = DiaAsignacion.objects.filter(fecha=hoy).first()
+    if modo and modo.solo_asignados and is_cuidadora(request.user):
+        # residentes asignados a esta cuidadora hoy
+        res_ids = list(Asignacion.objects.filter(fecha=hoy, cuidadora=request.user).values_list('residente_id', flat=True))
+        eventos_qs = eventos_qs.filter(residente_id__in=res_ids)
+
+    # (resto de la agrupación por horas igual que ya tenías)
     buckets = defaultdict(list)
     counts = defaultdict(int)
     for e in eventos_qs:
@@ -510,6 +528,7 @@ def admin_list_hoy(request):
         'horas': horas,
         'seleccion': selected,
     })
+
 
 @login_required
 @cuidadora_or_admin_required
@@ -823,3 +842,109 @@ def api_productos_suggest(request):
         add(_suggest_rxnorm(q, limit, timeout))
 
     return JsonResponse({"results": results})
+
+@login_required
+@tens_or_admin_required
+def asignaciones_hoy(request):
+    hoy = timezone.localdate()
+
+    # Todas las cuidadoras activas (grupo)
+    cuidadoras = User.objects.filter(is_active=True, groups__name=CUIDADORA_GROUP).order_by('first_name', 'username')
+
+    # Modo/selección del día
+    modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
+    seleccion_ids = set(modo.cuidadoras.values_list('id', flat=True))
+    # Si no hay selección guardada, por UX pre-marcamos todas
+    if not seleccion_ids:
+        seleccion_ids = set(cuidadoras.values_list('id', flat=True))
+
+    # Asignaciones existentes hoy
+    asignaciones = (
+        Asignacion.objects
+        .select_related('cuidadora', 'residente')
+        .filter(fecha=hoy)
+        .order_by('cuidadora__username', 'residente__nombre_completo')
+    )
+    grupos = {}
+    for a in asignaciones:
+        grupos.setdefault(a.cuidadora, []).append(a.residente)
+
+    return render(request, 'landing/asignaciones_hoy.html', {
+        'fecha': hoy,
+        'cuidadoras': cuidadoras,
+        'seleccion_ids': seleccion_ids,  # para checkboxes
+        'grupos': grupos,
+        'solo_asignados': modo.solo_asignados,
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+@tens_or_admin_required
+@transaction.atomic
+def asignaciones_generar(request):
+    """Genera asignación equitativa y aleatoria para HOY usando la selección de cuidadoras enviada."""
+    hoy = timezone.localdate()
+
+    # 1) Leer selección desde el formulario
+    ids_str = request.POST.getlist('cuidadores')  # checkboxes
+    try:
+        selected_ids = [int(x) for x in ids_str]
+    except ValueError:
+        selected_ids = []
+
+    # 2) Armar queryset de cuidadoras válidas (por grupo)
+    base_cuidadoras = User.objects.filter(is_active=True, groups__name=CUIDADORA_GROUP)
+    if selected_ids:
+        cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids)
+    else:
+        # si el usuario no marcó nada, tomamos todas
+        cuidadoras_qs = base_cuidadoras
+
+    cuidadoras = list(cuidadoras_qs.order_by('first_name', 'username'))
+
+    # 3) Guardar selección del día para persistirla
+    modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
+    modo.cuidadoras.set(cuidadoras_qs)  # persistimos la elección (puede ser vacío -> interpretado como "todas" en la vista)
+
+    # 4) Residente activos y reparto
+    residentes = list(Residente.objects.filter(activo=True).order_by('nombre_completo'))
+
+    if not cuidadoras or not residentes:
+        messages.error(request, "Faltan cuidadoras seleccionadas o no hay residentes activos.")
+        return redirect('asignaciones_hoy')
+
+    random.shuffle(residentes)  # aleatorio
+    Asignacion.objects.filter(fecha=hoy).delete()
+
+    bulk = []
+    for i, r in enumerate(residentes):
+        c = cuidadoras[i % len(cuidadoras)]  # reparto equitativo/round-robin
+        bulk.append(Asignacion(fecha=hoy, cuidadora=c, residente=r))
+    Asignacion.objects.bulk_create(bulk)
+
+    messages.success(request, f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} cuidadoras.")
+    return redirect('asignaciones_hoy')
+
+
+@login_required
+@require_http_methods(["POST"])
+@tens_or_admin_required
+def asignaciones_toggle_modo(request):
+    """Activa/Desactiva modo 'solo asignados' para HOY."""
+    hoy = timezone.localdate()
+    modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
+    modo.solo_asignados = request.POST.get('solo_asignados') == '1'
+    modo.save(update_fields=['solo_asignados'])
+    messages.success(request, f"Modo del día: {'solo asignados' if modo.solo_asignados else 'todos los pacientes'}.")
+    return redirect('asignaciones_hoy')
+
+@login_required
+@require_http_methods(["POST"])
+@tens_or_admin_required
+def asignaciones_limpiar(request):
+    """Elimina todas las asignaciones de HOY."""
+    hoy = timezone.localdate()
+    deleted, _ = Asignacion.objects.filter(fecha=hoy).delete()
+    messages.success(request, f"Se eliminaron {deleted} asignaciones de hoy.")
+    return redirect('asignaciones_hoy')

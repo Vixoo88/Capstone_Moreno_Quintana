@@ -109,3 +109,29 @@ class Administracion(models.Model):
     def __str__(self):
         return f"{self.residente} · {self.orden} · {self.programada_para:%Y-%m-%d %H:%M}"
 
+class DiaAsignacion(models.Model):
+    """Configura el modo de visibilidad de hoy: todos ven todo o solo lo asignado."""
+    fecha = models.DateField(unique=True)
+    solo_asignados = models.BooleanField(default=False)  # False = ver todo (por defecto)
+
+    cuidadoras = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='dias_asignacion_cuidadoras',
+        blank=True
+    )
+
+    def __str__(self):
+        return f"{self.fecha} · {'Solo asignados' if self.solo_asignados else 'Todos'}"
+
+class Asignacion(models.Model):
+    """Asignación (fecha, cuidadora, residente). Un residente solo puede tener una cuidadora ese día."""
+    fecha = models.DateField()
+    cuidadora = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="asignaciones")
+    residente = models.ForeignKey('Residente', on_delete=models.CASCADE, related_name="asignaciones")
+
+    class Meta:
+        unique_together = (('fecha', 'residente'),)
+        indexes = [models.Index(fields=['fecha', 'cuidadora']), models.Index(fields=['fecha', 'residente'])]
+
+    def __str__(self):
+        return f"{self.fecha} · {self.residente} → {self.cuidadora}"

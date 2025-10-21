@@ -32,8 +32,8 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
         {% if user.is_authenticated %}
-          {# Panel: admin o cuidadora #}
-          {% if user|is_admin or user|is_cuidadora %}
+          {# Panel: admin, cuidadora o TENS #}
+          {% if user|is_admin or user|is_cuidadora or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'dashboard' %}">
                 <i class="bi bi-speedometer2 me-1"></i>Panel
@@ -41,8 +41,8 @@
             </li>
           {% endif %}
 
-          {# Residentes: solo admin #}
-          {% if user|is_admin %}
+          {# Residentes: admin o TENS (TENS solo lectura en vistas) #}
+          {% if user|is_admin or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'residente_list' %}">
                 <i class="bi bi-people me-1"></i>Residentes
@@ -50,11 +50,20 @@
             </li>
           {% endif %}
 
-          {# Administración: admin o cuidadora #}
-          {% if user|is_admin or user|is_cuidadora %}
+          {# Administración: admin, cuidadora o TENS #}
+          {% if user|is_admin or user|is_cuidadora or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'admin_list_hoy' %}">
                 <i class="bi bi-capsule-pill me-1"></i>Administración
+              </a>
+            </li>
+          {% endif %}
+
+          {# Asignar cuidadores: admin o TENS #}
+          {% if user|is_admin or user|is_tens %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'asignaciones_hoy' %}">
+                <i class="bi bi-people-gear me-1"></i>Asignar cuidadores
               </a>
             </li>
           {% endif %}

@@ -31,4 +31,10 @@ urlpatterns = [
 
     path('api/productos/suggest/', views.api_productos_suggest, name='api_productos_suggest'),
 
+    path("asignaciones/", views.asignaciones_hoy, name="asignaciones_hoy"),
+    path("asignaciones/generar/", views.asignaciones_generar, name="asignaciones_generar"),
+    path("asignaciones/toggle/", views.asignaciones_toggle_modo, name="asignaciones_toggle_modo"),
+    path("asignaciones/limpiar/", views.asignaciones_limpiar, name="asignaciones_limpiar"),
+
+
 ]

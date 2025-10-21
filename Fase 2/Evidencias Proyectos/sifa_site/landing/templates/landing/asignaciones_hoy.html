@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load roles_tags %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+  <div class="glass-card p-4">
+    <h3 class="page-title mb-3">
+      <i class="bi bi-person-gear me-2"></i>Asignar cuidadores — {{ fecha|date:"d/m/Y" }}
+    </h3>
+
+    <div class="row g-3">
+      <!-- Columna izquierda: selección y acciones -->
+      <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-people me-1"></i>Seleccionar cuidadoras</span>
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-secondary" type="button" id="btnSelTodas">Todas</button>
+              <button class="btn btn-outline-secondary" type="button" id="btnSelNinguna">Ninguna</button>
+            </div>
+          </div>
+          <div class="card-body" style="max-height: 360px; overflow:auto;">
+            <form method="post" action="{% url 'asignaciones_generar' %}" id="formGenerar">
+              {% csrf_token %}
+              {% if cuidadoras %}
+                {% for c in cuidadoras %}
+                  <div class="form-check mb-1">
+                    <input class="form-check-input cuidadora-check" type="checkbox"
+                           name="cuidadores" id="c_{{ c.id }}" value="{{ c.id }}"
+                           {% if c.id in seleccion_ids %}checked{% endif %}>
+                    <label class="form-check-label" for="c_{{ c.id }}">
+                      {{ c.get_full_name|default:c.username }}
+                      <span class="text-muted small">({{ c.username }})</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="text-muted">No hay cuidadoras activas.</div>
+              {% endif %}
+              <hr class="my-3">
+              <button class="btn btn-gradient w-100">
+                <i class="bi bi-shuffle me-1"></i>Generar asignación equitativa
+              </button>
+              <div class="form-text mt-2">
+                Si no seleccionas ninguna, se usarán <b>todas</b> las cuidadoras activas por defecto.
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mt-3">
+          <div class="card-body d-flex gap-2">
+            <form method="post" action="{% url 'asignaciones_toggle_modo' %}">
+              {% csrf_token %}
+              <input type="hidden" name="solo_asignados" value="{{ solo_asignados|yesno:'0,1' }}">
+              <button class="btn btn-outline-secondary" onclick="this.previousElementSibling.value={{ solo_asignados|yesno:'1,0' }}">
+                {% if solo_asignados %}
+                  <i class="bi bi-people me-1"></i>Ver TODOS (quitar restricción)
+                {% else %}
+                  <i class="bi bi-person-check me-1"></i>Solo ASIGNADOS (restringir)
+                {% endif %}
+              </button>
+            </form>
+
+            <form method="post" action="{% url 'asignaciones_limpiar' %}">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Quitar asignaciones</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: resumen actual -->
+      <div class="col-md-7">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-semibold">
+            <i class="bi bi-list-check me-1"></i>Asignaciones de hoy
+            <span class="badge bg-secondary ms-2">{{ grupos|length }} cuidadora(s)</span>
+          </div>
+          <div class="card-body">
+            {% if grupos %}
+              <div class="row g-3">
+                {% for cuid, lista in grupos.items %}
+                  <div class="col-lg-6">
+                    <div class="border rounded-3 p-2 h-100">
+                      <div class="fw-semibold mb-2">
+                        <i class="bi bi-person-heart me-1"></i>{{ cuid.get_full_name|default:cuid.username }}
+                      </div>
+                      {% if lista %}
+                        <ul class="list-unstyled small mb-0">
+                          {% for r in lista %}
+                            <li class="py-1 d-flex justify-content-between border-bottom">
+                              <span>{{ r.nombre_completo }}</span>
+                              <span class="text-muted">{{ r.rut }}</span>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      {% else %}
+                        <div class="text-muted small">Sin residentes asignados.</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-info mb-0">Aún no hay asignaciones hoy.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+  (function(){
+    const todasBtn = document.getElementById('btnSelTodas');
+    const ningunaBtn = document.getElementById('btnSelNinguna');
+    const checks = () => Array.from(document.querySelectorAll('.cuidadora-check'));
+
+    if (todasBtn) todasBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = true));
+    if (ningunaBtn) ningunaBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = false));
+  })();
+</script>
+{% endblock %}
+{% endblock %}
