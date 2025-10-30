@@ -24,6 +24,8 @@ urlpatterns = [
     path('administracion/marcar/<int:admin_id>/', views.admin_marcar, name='admin_marcar'),
 
     path('registro/<int:residente_id>/', views.registro_mensual, name='registro_mensual'),
+    path('residentes/<int:residente_id>/registro-mensual/pdf/', views.registro_mensual_pdf, name='registro_mensual_pdf'),
+
 
     path("auth/logout/", LogoutView.as_view(next_page="home_public"), name="logout"),
 

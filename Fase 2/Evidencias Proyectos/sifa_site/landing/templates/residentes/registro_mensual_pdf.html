@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Registro mensual — {{ residente.nombre_completo }} ({{ year }}-{{ month|stringformat:"02d" }})</title>
+</head>
+<body>
+  <h3>Registro mensual — {{ residente.nombre_completo }}</h3>
+  <div class="meta">Período: {{ year }}-{{ month|stringformat:"02d" }} · Generado: {{ generated_at }}</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="label">Medicamento · Dosis — Hora</th>
+        {% for d in days %}
+          <th>{{ d }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="label">{{ row.label }}</td>
+          {% for val in row.cells %}
+            <td>{{ val }}</td>
+          {% endfor %}
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="{{ days|length|add:1 }}">Sin datos para este mes.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="legend">
+    Leyenda: ✓ dada · ✕ omitida · R rechazada · • pendiente. Entre paréntesis aparece quien la registró.
+  </div>
+</body>
+</html>

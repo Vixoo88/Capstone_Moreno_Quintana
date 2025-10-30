@@ -27,6 +27,14 @@ from .roles import (
     CUIDADORA_GROUP,
 )
 
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+try:
+    from weasyprint import HTML, CSS
+    _weasy_available = True
+except Exception:
+    _weasy_available = False
+
 from .models import (
     Administracion, HoraProgramada, OrdenMedicamento, Receta, Residente, Producto
 )
@@ -601,6 +609,24 @@ def admin_marcar(request, admin_id):
 # Registro mensual
 # =========================================================
 
+# helpers (colócalos cerca de tus otros helpers)
+from datetime import date
+
+def _calc_edad(fn):
+    if not fn:
+        return None
+    hoy = timezone.localdate()
+    return hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+
+
+from calendar import monthrange
+from datetime import datetime
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from .models import Administracion, Residente
+from .roles import admin_required
+
 @login_required
 @admin_required
 def registro_mensual(request, residente_id):
@@ -609,12 +635,106 @@ def registro_mensual(request, residente_id):
     ✓ (Ana), ✕ (Pedro), R (Luis) o • si está pendiente.
     Si hubiera más de un registro ese día para la misma fila, se concatena con '/'.
     """
+    # --- helper local para edad ---
+    def _calc_edad(fn):
+        if not fn:
+            return None
+        hoy = timezone.localdate()
+        return hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+
     res = get_object_or_404(Residente, pk=residente_id)
+
+    # Año/mes con fallback seguro
     hoy_local = timezone.localdate()
-    y = int(request.GET.get('year', hoy_local.year))
-    m = int(request.GET.get('month', hoy_local.month))
+    try:
+        y = int(request.GET.get('year', hoy_local.year))
+    except (TypeError, ValueError):
+        y = hoy_local.year
+    try:
+        m = int(request.GET.get('month', hoy_local.month))
+    except (TypeError, ValueError):
+        m = hoy_local.month
+
+    # Guardas suaves
+    if y < 2000 or y > 2100:
+        y = hoy_local.year
+    if m < 1 or m > 12:
+        m = hoy_local.month
+
     days_in_month = monthrange(y, m)[1]
 
+    # Ventana de tiempo (aware)
+    inicio = timezone.make_aware(datetime(y, m, 1, 0, 0))
+    fin = timezone.make_aware(datetime(y, m, days_in_month, 23, 59))
+
+    # Eventos del mes del residente
+    eventos = (
+        Administracion.objects
+        .select_related("orden__producto", "realizada_por")
+        .filter(residente=res, programada_para__range=(inicio, fin))
+        .order_by("orden_id", "programada_para")
+    )
+
+    # key = (orden_id, HH:MM local) → una fila por hora específica
+    rows_map = {}
+    for e in eventos:
+        local_dt = timezone.localtime(e.programada_para)
+        hhmm_24 = local_dt.strftime("%H:%M")
+        label_hora = _fmt_ampm(e.programada_para)  # ya definida en tu archivo
+
+        prod = e.orden.producto
+        med_label = f"{prod.nombre} {prod.potencia}".strip()
+        orden_label = f"{med_label} · {e.orden.dosis} — {label_hora}"
+
+        key = (e.orden_id, hhmm_24)
+        if key not in rows_map:
+            rows_map[key] = {"label": orden_label, "cells": [""] * days_in_month}
+
+        sym = {"DADA": "✓", "OMITIDA": "✕", "RECHAZADA": "R", "PENDIENTE": "•"}[e.estado]
+        who = _short_user(e.realizada_por) if e.estado != 'PENDIENTE' and e.realizada_por else ''  # _short_user ya definida
+        mark = f"{sym}{f' ({who})' if who else ''}"
+
+        idx = local_dt.day - 1
+        rows_map[key]["cells"][idx] = (
+            rows_map[key]["cells"][idx] + " / " if rows_map[key]["cells"][idx] else ""
+        ) + mark
+
+    # Orden: por nombre de medicamento y hora
+    def sort_key(item):
+        (orden_id, hhmm), data = item
+        h, m_ = int(hhmm[:2]), int(hhmm[3:5])
+        return (data["label"].split(" — ")[0].lower(), h, m_)
+
+    rows = [v for _, v in sorted(rows_map.items(), key=sort_key)]
+
+    # Ficha del paciente para cabecera/impresión
+    paciente = {
+        "nombre": res.nombre_completo,
+        "rut": res.rut,
+        "fecha_nacimiento": res.fecha_nacimiento,
+        "edad": _calc_edad(res.fecha_nacimiento),
+        "sexo": res.get_sexo_display() if hasattr(res, "get_sexo_display") else res.sexo,
+        "alergias": (res.alergias or "").strip(),
+        "activo": res.activo,
+    }
+
+    return render(request, 'residentes/registro_mensual.html', {
+        'residente': res,
+        'year': y,
+        'month': m,
+        'days': range(1, days_in_month + 1),
+        'rows': rows,
+        'paciente': paciente,   # <-- ficha para el template
+    })
+
+
+
+def _build_registro_mensual_ctx(res, y, m):
+    """
+    Copia 99% de la lógica de 'registro_mensual' para construir days/rows.
+    Así no duplicamos reglas sueltas, y la tabla del PDF queda idéntica.
+    """
+    days_in_month = monthrange(y, m)[1]
     inicio = timezone.make_aware(datetime(y, m, 1, 0, 0))
     fin = timezone.make_aware(datetime(y, m, days_in_month, 23, 59))
 
@@ -625,7 +745,6 @@ def registro_mensual(request, residente_id):
         .order_by("orden_id", "programada_para")
     )
 
-    # key = (orden_id, HH:MM local)  → una fila por hora específica
     rows_map = {}
     for e in eventos:
         local_dt = timezone.localtime(e.programada_para)
@@ -647,21 +766,74 @@ def registro_mensual(request, residente_id):
         idx = local_dt.day - 1
         rows_map[key]["cells"][idx] = (rows_map[key]["cells"][idx] + " / " if rows_map[key]["cells"][idx] else "") + mark
 
-    # Orden: por nombre de medicamento y hora
     def sort_key(item):
         (orden_id, hhmm), data = item
-        h, m = int(hhmm[:2]), int(hhmm[3:5])
-        return (data["label"].split(" — ")[0].lower(), h, m)
+        h, mm = int(hhmm[:2]), int(hhmm[3:5])
+        return (data["label"].split(" — ")[0].lower(), h, mm)
 
     rows = [v for _, v in sorted(rows_map.items(), key=sort_key)]
 
-    return render(request, 'residentes/registro_mensual.html', {
-        'residente': res,
-        'year': y,
-        'month': m,
-        'days': range(1, days_in_month + 1),
-        'rows': rows
-    })
+    return {
+        "days": range(1, days_in_month + 1),
+        "rows": rows,
+        "days_in_month": days_in_month,
+    }
+
+
+# --- ADD: view PDF ---
+@login_required
+@admin_required
+def registro_mensual_pdf(request, residente_id):
+    """
+    Genera un PDF A4 apaisado del registro mensual del residente.
+    """
+    if not _weasy_available:
+        return HttpResponse("WeasyPrint no está instalado en el servidor.", status=500)
+
+    res = get_object_or_404(Residente, pk=residente_id)
+
+    hoy_local = timezone.localdate()
+    try:
+        y = int(request.GET.get('year', hoy_local.year))
+        m = int(request.GET.get('month', hoy_local.month))
+    except (TypeError, ValueError):
+        y, m = hoy_local.year, hoy_local.month
+
+    data = _build_registro_mensual_ctx(res, y, m)
+
+    ctx = {
+        "residente": res,
+        "year": y,
+        "month": m,
+        "days": data["days"],
+        "rows": data["rows"],
+        "generated_at": timezone.localdate(),
+    }
+
+    html_string = render_to_string("residentes/registro_mensual_pdf.html", ctx, request=request)
+
+    css = CSS(string="""
+      @page { size: A4 landscape; margin: 10mm; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; }
+      h3 { margin: 0 0 6px 0; }
+      .meta { color: #666; font-size: 11px; margin-bottom: 8px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+      thead th { background: #eee; border: 1px solid #ccc; padding: 6px; }
+      td { border: 1px solid #ddd; padding: 4px 6px; text-align: center; word-wrap: break-word; }
+      td.label, th.label { text-align: left; font-weight: 600; width: 320px; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+      .legend { color:#555; font-size: 10px; margin-top: 6px; }
+    """)
+
+    base_url = request.build_absolute_uri('/')  # por si referencias estáticos o imágenes
+    pdf = HTML(string=html_string, base_url=base_url).write_pdf(stylesheets=[css])
+
+    filename = f"registro_{res.id}_{y}-{m:02d}.pdf"
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
 
 
 # =========================================================
