@@ -1111,3 +1111,176 @@ def asignaciones_limpiar(request):
     deleted, _ = Asignacion.objects.filter(fecha=hoy).delete()
     messages.success(request, f"Se eliminaron {deleted} asignaciones de hoy.")
     return redirect('asignaciones_hoy')
+
+
+
+
+
+
+# landing/views.py            CRUD USUARIOS
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User, Group
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.db.models import Q
+
+from .roles import admin_required  # ya lo tienes
+from .forms import (
+    AdminUserCreateForm, AdminUserUpdateForm, AdminUserPasswordForm,
+    assign_single_role, _ensure_role_group, ROLE_CHOICES
+)
+
+# Lista de usuarios (búsqueda simple)
+@login_required
+@admin_required
+def user_list(request):
+    q = (request.GET.get("q") or "").strip()
+    users = User.objects.all().order_by("is_active", "username")
+    if q:
+        users = users.filter(
+            Q(username__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(email__icontains=q)
+        )
+    # rol (primer grupo conocido)
+    role_map = dict(ROLE_CHOICES)
+    items = []
+    for u in users:
+        rol = next((g.name for g in u.groups.all() if g.name in role_map), "—")
+        items.append((u, rol))
+    return render(request, "users/user_list.html", {"items": items, "q": q})
+
+# Crear usuario
+@login_required
+@admin_required
+def user_create(request):
+    if request.method == "POST":
+        form = AdminUserCreateForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, f"Usuario '{user.username}' creado.")
+            return redirect("user_list")
+    else:
+        form = AdminUserCreateForm(initial={"is_active": True})
+    return render(request, "users/user_form.html", {"form": form, "title": "Crear usuario"})
+
+# Editar usuario (perfil + rol)
+@login_required
+@admin_required
+def user_edit(request, user_id):
+    u = get_object_or_404(User, pk=user_id)
+    if request.method == "POST":
+        form = AdminUserUpdateForm(request.POST, instance=u)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Usuario '{u.username}' actualizado.")
+            return redirect("user_list")
+    else:
+        form = AdminUserUpdateForm(instance=u)
+    return render(request, "users/user_form.html", {"form": form, "title": f"Editar: {u.username}", "user_obj": u})
+
+# Cambiar contraseña
+@login_required
+@admin_required
+def user_password(request, user_id):
+    u = get_object_or_404(User, pk=user_id)
+    if request.method == "POST":
+        form = AdminUserPasswordForm(request.POST)
+        if form.is_valid():
+            u.set_password(form.cleaned_data["password1"])
+            u.save(update_fields=["password"])
+            messages.success(request, f"Contraseña actualizada para '{u.username}'.")
+            return redirect("user_list")
+    else:
+        form = AdminUserPasswordForm()
+    return render(request, "users/user_password.html", {"form": form, "title": f"Contraseña: {u.username}", "user_obj": u})
+
+# Eliminar usuario (con protección básica)
+@login_required
+@admin_required
+def user_delete(request, user_id):
+    u = get_object_or_404(User, pk=user_id)
+    if request.user == u:
+        messages.error(request, "No puedes eliminar tu propio usuario.")
+        return redirect("user_list")
+    if request.method == "POST":
+        username = u.username
+        u.delete()
+        messages.success(request, f"Usuario '{username}' eliminado.")
+        return redirect("user_list")
+    return render(request, "users/user_confirm_delete.html", {"user_obj": u})
+
+
+
+
+# landing/views.py            CRUD MEDICAMENTOS
+from django.core.paginator import Paginator
+from .forms import ProductoForm
+from .roles import admin_required
+from .models import Producto
+
+@login_required
+@admin_required
+def medicamentos_list(request):
+    q = (request.GET.get("q") or "").strip()
+    qs = Producto.objects.all().order_by("nombre", "potencia")
+    if q:
+        qs = qs.filter(
+            Q(nombre__icontains=q) | Q(potencia__icontains=q) | Q(forma__icontains=q)
+        )
+    paginator = Paginator(qs, 20)
+    page = request.GET.get("page")
+    page_obj = paginator.get_page(page)
+    return render(request, "medicamentos/medicamentos_list.html", {
+        "page_obj": page_obj,
+        "q": q,
+    })
+
+@login_required
+@admin_required
+def medicamento_create(request):
+    if request.method == "POST":
+        form = ProductoForm(request.POST)
+        if form.is_valid():
+            p = form.save()
+            messages.success(request, f"Medicamento '{p.nombre} {p.potencia or ''}'.")
+            return redirect("medicamentos_list")
+    else:
+        form = ProductoForm()
+    return render(request, "medicamentos/medicamento_form.html", {
+        "form": form,
+        "title": "Nuevo medicamento",
+    })
+
+@login_required
+@admin_required
+def medicamento_edit(request, producto_id):
+    p = get_object_or_404(Producto, pk=producto_id)
+    if request.method == "POST":
+        form = ProductoForm(request.POST, instance=p)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Medicamento '{p.nombre}' actualizado.")
+            return redirect("medicamentos_list")
+    else:
+        form = ProductoForm(instance=p)
+    return render(request, "medicamentos/medicamento_form.html", {
+        "form": form,
+        "title": f"Editar medicamento",
+        "obj": p,
+    })
+
+@login_required
+@admin_required
+def medicamento_delete(request, producto_id):
+    p = get_object_or_404(Producto, pk=producto_id)
+    if request.method == "POST":
+        nombre = f"{p.nombre} {p.potencia or ''}".strip()
+        p.delete()
+        messages.success(request, f"Medicamento '{nombre}' eliminado.")
+        return redirect("medicamentos_list")
+    return render(request, "medicamentos/medicamento_confirm_delete.html", {
+        "obj": p
+    })

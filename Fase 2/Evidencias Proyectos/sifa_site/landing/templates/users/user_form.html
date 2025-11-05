@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 760px;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">{{ title }}</h3>
+  </div>
+
+  <div class="glass-card p-3 p-md-4">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# Errores generales del form (no-field errors) #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- === Datos de cuenta === -->
+      <fieldset class="mb-3">
+        <legend class="fs-6 text-uppercase text-secondary mb-2">
+          <i class="bi bi-person-gear me-1"></i> Datos de cuenta
+        </legend>
+
+        <div class="row g-3 row-cols-1 row-cols-md-2">
+          {% if form.username %}
+            <div class="col">
+              <label class="form-label mb-1">{{ form.username.label }}</label>
+              {{ form.username }}
+              {% if form.username.help_text %}<div class="form-text">{{ form.username.help_text }}</div>{% endif %}
+              {% if form.username.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for e in form.username.errors %}{{ e }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="col">
+            <label class="form-label mb-1">{{ form.role.label }}</label>
+            {{ form.role }}
+            {% if form.role.help_text %}<div class="form-text">{{ form.role.help_text }}</div>{% endif %}
+            {% if form.role.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.role.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">{{ form.first_name.label }}</label>
+            {{ form.first_name }}
+            {% if form.first_name.help_text %}<div class="form-text">{{ form.first_name.help_text }}</div>{% endif %}
+            {% if form.first_name.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.first_name.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">{{ form.last_name.label }}</label>
+            {{ form.last_name }}
+            {% if form.last_name.help_text %}<div class="form-text">{{ form.last_name.help_text }}</div>{% endif %}
+            {% if form.last_name.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.last_name.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% if form.email.help_text %}<div class="form-text">{{ form.email.help_text }}</div>{% endif %}
+            {% if form.email.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.email.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col d-flex align-items-center">
+            <div class="form-check form-switch mt-3 mt-md-0">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+            </div>
+            {% if form.is_active.errors %}
+              <div class="invalid-feedback d-block ms-3">
+                {% for e in form.is_active.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      {% if form.password1 %}
+      <!-- === Contraseña (solo si el form la trae) === -->
+      <fieldset class="mb-2">
+        <legend class="fs-6 text-uppercase text-secondary mb-2">
+          <i class="bi bi-key me-1"></i> Contraseña
+        </legend>
+
+        <div class="row g-3 row-cols-1 row-cols-md-2">
+          <div class="col">
+            <label class="form-label mb-1">{{ form.password1.label }}</label>
+            {{ form.password1 }}
+            {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text }}</div>{% endif %}
+            {% if form.password1.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.password1.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">{{ form.password2.label }}</label>
+            {{ form.password2 }}
+            {% if form.password2.help_text %}<div class="form-text">{{ form.password2.help_text }}</div>{% endif %}
+            {% if form.password2.errors %}
+              <div class="invalid-feedback d-block">
+                {% for e in form.password2.errors %}{{ e }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </fieldset>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary">
+          <i class="bi bi-check2 me-1"></i> Guardar
+        </button>
+        <a class="btn btn-outline-secondary" href="{% url 'user_list' %}">
+          <i class="bi bi-arrow-left me-1"></i> Volver
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* Ajustes de usabilidad y responsivo */
+  .glass-card{ border-radius: 12px; border: 1px solid rgba(0,0,0,0.06); }
+  .form-label{ font-weight: 600; }
+  /* Asegura ancho completo de los widgets por si no traen clases Bootstrap */
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+  select, textarea { width: 100%; }
+  /* Separación entre fieldsets en móviles */
+  @media (max-width: 768px){
+    fieldset{ margin-bottom: .75rem; }
+  }
+</style>
+{% endblock %}

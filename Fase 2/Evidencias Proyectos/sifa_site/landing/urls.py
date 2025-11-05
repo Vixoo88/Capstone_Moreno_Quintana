@@ -38,5 +38,16 @@ urlpatterns = [
     path("asignaciones/toggle/", views.asignaciones_toggle_modo, name="asignaciones_toggle_modo"),
     path("asignaciones/limpiar/", views.asignaciones_limpiar, name="asignaciones_limpiar"),
 
+    # CRUD usuarios
+    path("users/", views.user_list, name="user_list"),
+    path("users/new/", views.user_create, name="user_create"),
+    path("users/<int:user_id>/edit/", views.user_edit, name="user_edit"),
+    path("users/<int:user_id>/password/", views.user_password, name="user_password"),
+    path("users/<int:user_id>/delete/", views.user_delete, name="user_delete"),
 
+    # CRUD MEDICAMENTOS
+    path("medicamentos/", views.medicamentos_list, name="medicamentos_list"),
+    path("medicamentos/nuevo/", views.medicamento_create, name="medicamento_create"),
+    path("medicamentos/<int:producto_id>/editar/", views.medicamento_edit, name="medicamento_edit"),
+    path("medicamentos/<int:producto_id>/eliminar/", views.medicamento_delete, name="medicamento_delete"),
 ]

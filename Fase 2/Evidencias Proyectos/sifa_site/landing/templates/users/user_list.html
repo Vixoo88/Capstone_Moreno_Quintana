@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Usuarios</h3>
+    <a class="btn btn-sm btn-primary" href="{% url 'user_create' %}"><i class="bi bi-plus-lg me-1"></i> Nuevo</a>
+  </div>
+
+  <form method="get" class="mb-2 d-flex gap-2">
+    <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar usuario...">
+    <button class="btn btn-sm btn-outline-secondary">Buscar</button>
+  </form>
+
+  <div class="glass-card p-2">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Usuario</th>
+            <th>Nombre</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th style="width:220px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u, rol in items %}
+            <tr>
+              <td class="fw-semibold">{{ u.username }}</td>
+              <td>{{ u.get_full_name|default:u.username }}</td>
+              <td>{{ u.email }}</td>
+              <td><span class="badge bg-light text-dark">{{ rol }}</span></td>
+              <td>
+                {% if u.is_active %}
+                  <span class="badge bg-success-subtle text-success">Activo</span>
+                {% else %}
+                  <span class="badge bg-secondary">Inactivo</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'user_edit' u.id %}">Editar</a>
+                <a class="btn btn-sm btn-outline-warning" href="{% url 'user_password' u.id %}">Contraseña</a>
+                <a class="btn btn-sm btn-outline-danger" href="{% url 'user_delete' u.id %}">Eliminar</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center text-secondary">Sin usuarios.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

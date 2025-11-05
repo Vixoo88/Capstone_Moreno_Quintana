@@ -68,6 +68,24 @@
             </li>
           {% endif %}
 
+          {# NUEVO: Usuarios (solo admin) #}
+          {% if user|is_admin %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'user_list' %}">
+                <i class="bi bi-person-gear me-1"></i>Usuarios
+              </a>
+            </li>
+          {% endif %}
+
+          {% if request.user.is_authenticated and request.user.is_staff %}
+            {# si usas grupos/roles, puedes condicionar a admin con tu helper is_admin #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'medicamentos_list' %}">
+                <i class="bi bi-capsule"></i> Medicamentos
+              </a>
+            </li>
+          {% endif %}
+
         {% else %}
           <li class="nav-item"><a class="nav-link" href="#como">Cómo funciona</a></li>
           <li class="nav-item"><a class="nav-link" href="#beneficios">Beneficios</a></li>

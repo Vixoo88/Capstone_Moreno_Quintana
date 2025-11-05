@@ -69,3 +69,108 @@ class AdminMarcarForm(forms.ModelForm):
         widgets = {
             'estado': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
+
+
+# landing/forms.py                  CRUD USUARIOS
+from django import forms
+from django.contrib.auth.models import User, Group
+
+ROLE_CHOICES = [
+    ("ADMIN", "Admin"),
+    ("TENS", "TENS"),
+    ("CUIDADORA", "Cuidadora"),
+]
+
+def _ensure_role_group(name: str) -> Group:
+    g, _ = Group.objects.get_or_create(name=name)
+    return g
+
+def assign_single_role(user: User, role_name: str):
+    # Quita los roles conocidos y asigna solo el seleccionado
+    known = {r for r, _ in ROLE_CHOICES}
+    # Remueve
+    for g in user.groups.all():
+        if g.name in known:
+            user.groups.remove(g)
+    # Asigna
+    user.groups.add(_ensure_role_group(role_name))
+
+class AdminUserCreateForm(forms.ModelForm):
+    role = forms.ChoiceField(choices=ROLE_CHOICES, label="Rol")
+    password1 = forms.CharField(label="Contraseña", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput)
+
+    class Meta:
+        model = User
+        fields = ["username", "first_name", "last_name", "email", "is_active"]
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("password1") or ""
+        p2 = cleaned.get("password2") or ""
+        if p1 != p2:
+            self.add_error("password2", "Las contraseñas no coinciden.")
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+            assign_single_role(user, self.cleaned_data["role"])
+        return user
+
+class AdminUserUpdateForm(forms.ModelForm):
+    role = forms.ChoiceField(choices=ROLE_CHOICES, label="Rol")
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        self.instance: User = kwargs.get("instance")
+        super().__init__(*args, **kwargs)
+        # Precarga el rol actual (primer grupo que coincida)
+        current = next((g.name for g in self.instance.groups.all() if g.name in dict(ROLE_CHOICES)), None)
+        if current:
+            self.fields["role"].initial = current
+
+    def save(self, commit=True):
+        user = super().save(commit)
+        assign_single_role(user, self.cleaned_data["role"])
+        return user
+
+class AdminUserPasswordForm(forms.Form):
+    password1 = forms.CharField(label="Nueva contraseña", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("password1") != cleaned.get("password2"):
+            self.add_error("password2", "Las contraseñas no coinciden.")
+        return cleaned
+
+
+# landing/forms.py             CRUD MEDICAMENTOS
+from django import forms
+from .models import Producto
+
+class ProductoForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ["nombre", "potencia", "forma"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Paracetamol"}),
+            "potencia": forms.TextInput(attrs={"class": "form-control", "placeholder": "500 mg"}),
+            "forma": forms.TextInput(attrs={"class": "form-control", "placeholder": "Tabletas"}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        # normaliza espacios
+        for k in ("nombre", "potencia", "forma"):
+            if cleaned.get(k):
+                cleaned[k] = " ".join(str(cleaned[k]).split())
+        return cleaned
