@@ -147,7 +147,7 @@ DRUG_SUGGEST_LIMIT = 10            # tope de sugerencias
 DRUG_SUGGEST_TIMEOUT = 4           # segundos de timeout para APIs externas
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8455400576:AAFsXnUvLKSNbe4sHKVj7JllDIEQaVoVeqQ")
-TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "2091874703") 
+TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", "-5084611174") 
 
 # DEBUG = False
 # ALLOWED_HOSTS = ["Vixoo.pythonanywhere.com"]

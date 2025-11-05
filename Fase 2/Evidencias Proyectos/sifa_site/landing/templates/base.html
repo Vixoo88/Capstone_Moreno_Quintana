@@ -32,8 +32,8 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
         {% if user.is_authenticated %}
-          {# Panel: admin, cuidadora o TENS #}
-          {% if user|is_admin or user|is_cuidadora or user|is_tens %}
+          {# Panel: admin, cuidadora, TENS y doctor #}
+          {% if user|is_admin or user|is_cuidadora or user|is_tens or user|is_doctor %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'dashboard' %}">
                 <i class="bi bi-speedometer2 me-1"></i>Panel
@@ -41,8 +41,8 @@
             </li>
           {% endif %}
 
-          {# Residentes: admin o TENS (TENS solo lectura en vistas) #}
-          {% if user|is_admin or user|is_tens %}
+          {# Residentes: admin, TENS y doctor #}
+          {% if user|is_admin or user|is_tens or user|is_doctor %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'residente_list' %}">
                 <i class="bi bi-people me-1"></i>Residentes
@@ -50,7 +50,7 @@
             </li>
           {% endif %}
 
-          {# Administración: admin, cuidadora o TENS #}
+          {# Administración (marcado diario): admin, cuidadora o TENS (no doctor) #}
           {% if user|is_admin or user|is_cuidadora or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'admin_list_hoy' %}">
@@ -59,7 +59,7 @@
             </li>
           {% endif %}
 
-          {# Asignar cuidadores: admin o TENS #}
+          {# Asignar cuidadores: admin o TENS (no doctor) #}
           {% if user|is_admin or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'asignaciones_hoy' %}">
@@ -68,7 +68,7 @@
             </li>
           {% endif %}
 
-          {# NUEVO: Usuarios (solo admin) #}
+          {# Usuarios (solo admin) #}
           {% if user|is_admin %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'user_list' %}">
@@ -77,8 +77,8 @@
             </li>
           {% endif %}
 
-          {% if request.user.is_authenticated and request.user.is_staff %}
-            {# si usas grupos/roles, puedes condicionar a admin con tu helper is_admin #}
+          {# Medicamentos (solo admin) #}
+          {% if user|is_admin %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'medicamentos_list' %}">
                 <i class="bi bi-capsule"></i> Medicamentos

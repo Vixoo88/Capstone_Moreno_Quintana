@@ -50,4 +50,8 @@ urlpatterns = [
     path("medicamentos/nuevo/", views.medicamento_create, name="medicamento_create"),
     path("medicamentos/<int:producto_id>/editar/", views.medicamento_edit, name="medicamento_edit"),
     path("medicamentos/<int:producto_id>/eliminar/", views.medicamento_delete, name="medicamento_delete"),
+
+    # MANDAR MENSAJE
+    path("asignaciones/avisar-meds/", views.asignaciones_avisar_meds, name="asignaciones_avisar_meds"),
+
 ]

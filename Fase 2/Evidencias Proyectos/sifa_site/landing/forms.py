@@ -81,6 +81,7 @@ ROLE_CHOICES = [
     ("ADMIN", "Admin"),
     ("TENS", "TENS"),
     ("CUIDADORA", "Cuidadora"),
+    ("DOCTOR", "Doctor"),   # << nuevo
 ]
 
 def _ensure_role_group(name: str) -> Group:

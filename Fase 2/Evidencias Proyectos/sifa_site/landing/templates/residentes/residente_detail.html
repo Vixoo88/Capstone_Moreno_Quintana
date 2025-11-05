@@ -1,33 +1,78 @@
 {% extends 'base.html' %}
+{% load roles_tags %} {# para usar is_admin/is_doctor en botones #}
 {% block content %}
 <div class="container py-4">
+
   <div class="d-flex align-items-center justify-content-between mb-3">
-  <h2 class="page-title mb-0"><i class="bi bi-person-vcard me-2"></i>{{ residente.nombre_completo }}</h2>
-  <div class="d-flex gap-2">
-    <a class="btn btn-gradient" href="{% url 'receta_create' residente.id %}">
-      <i class="bi bi-prescription2 me-1"></i>Nueva receta
-    </a>
-    <form method="post" action="{% url 'residente_delete' residente.id %}"
-          onsubmit="return confirm('¿Eliminar al residente y todas sus recetas? Esta acción no se puede deshacer.');"
-          class="d-inline">
-      {% csrf_token %}
-      <button class="btn btn-outline-danger">
-        <i class="bi bi-trash3 me-1"></i>Eliminar
-      </button>
-    </form>
+    <h2 class="page-title mb-0">
+      <i class="bi bi-person-vcard me-2"></i>{{ residente.nombre_completo }}
+    </h2>
+
+    <div class="d-flex gap-2">
+      {# Nueva receta: admin o doctor #}
+      {% if user|is_admin or user|is_doctor %}
+        <a class="btn btn-gradient" href="{% url 'receta_create' residente.id %}">
+          <i class="bi bi-prescription2 me-1"></i>Nueva receta
+        </a>
+      {% endif %}
+
+      {# Eliminar residente: solo admin #}
+      {% if user|is_admin %}
+        <form method="post" action="{% url 'residente_delete' residente.id %}"
+              onsubmit="return confirm('¿Eliminar al residente y todas sus recetas? Esta acción no se puede deshacer.');"
+              class="d-inline">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger">
+            <i class="bi bi-trash3 me-1"></i>Eliminar
+          </button>
+        </form>
+      {% endif %}
+    </div>
   </div>
-</div>
 
   {% for rec in residente.recetas.all %}
     <div class="glass-card p-3 mb-3">
       <div class="d-flex align-items-center justify-content-between">
-        <div class="fw-bold">Receta #{{ rec.id }} · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}</div>
-        <form method="post" action="{% url 'receta_delete' rec.id %}" onsubmit="return confirm('¿Eliminar receta completa?');">
-          {% csrf_token %}
-          <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3 me-1"></i>Eliminar</button>
-        </form>
+        <div class="fw-bold">
+          Receta #{{ rec.id }} · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}
+        </div>
+
+        {# Eliminar receta: admin o doctor #}
+        {% if user|is_admin or user|is_doctor %}
+          <form method="post" action="{% url 'receta_delete' rec.id %}" onsubmit="return confirm('¿Eliminar receta completa?');">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-trash3 me-1"></i>Eliminar
+            </button>
+          </form>
+        {% endif %}
       </div>
-      <div class="text-secondary small mb-2">{{ rec.observaciones }}</div>
+
+      {# NUEVO: autor y fecha de creación #}
+      <div class="mb-2">
+        <span class="badge text-bg-light border small">
+          <i class="bi bi-person-badge me-1"></i>
+          {% if rec.medico %}
+            {{ rec.medico.get_full_name|default:rec.medico.username }}
+          {% else %}
+            —
+          {% endif %}
+        </span>
+        {% if rec.creada_en %}
+          <span class="badge text-bg-light border small">
+            <i class="bi bi-clock-history me-1"></i>{{ rec.creada_en|date:"d/m/Y H:i" }}
+          </span>
+        {% endif %}
+        {% if rec.activa is not None %}
+          <span class="badge {% if rec.activa %}text-bg-success-subtle text-success{% else %}text-bg-secondary{% endif %} border small">
+            {% if rec.activa %} Activa {% else %} Inactiva {% endif %}
+          </span>
+        {% endif %}
+      </div>
+
+      {% if rec.observaciones %}
+        <div class="text-secondary small mb-2">{{ rec.observaciones }}</div>
+      {% endif %}
 
       {% if rec.ordenes.all %}
         <div class="list-group list-group-flush">
@@ -35,26 +80,38 @@
             <div class="list-group-item">
               <div class="d-flex align-items-center justify-content-between">
                 <div>
-                  <div class="fw-semibold">{{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}</div>
+                  <div class="fw-semibold">
+                    {{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}
+                  </div>
+
                   <div class="small text-secondary">
-                    {% for h in o.horas.all %}{% if not forloop.first %} · {% endif %}{{ h.hora|time:"H:i" }}{% endfor %}
+                    {% for h in o.horas.all %}
+                      {% if not forloop.first %} · {% endif %}
+                      {{ h.hora|time:"H:i" }}
+                    {% endfor %}
                     {% if o.via %} · {{ o.via }}{% endif %}
                     {% if o.indicaciones %} · {{ o.indicaciones }}{% endif %}
                   </div>
+
                   <div class="small mt-1">
                     <span class="badge text-bg-light border">Stock: {{ o.stock_asignado }}</span>
                     <span class="badge text-bg-light border">Crítico: {{ o.stock_critico }}</span>
                   </div>
                 </div>
+
                 <div class="d-flex gap-2">
-                  <a class="btn btn-outline-primary btn-sm" href="{% url 'orden_edit' o.id %}">
-                    <i class="bi bi-pencil-square me-1"></i>Editar
-                  </a>
-                  <form method="post" action="{% url 'orden_delete' o.id %}"
-                        onsubmit="return confirm('¿Eliminar medicamento de la receta?');">
-                    {% csrf_token %}
-                    <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Eliminar</button>
-                  </form>
+                  {% if user|is_admin or user|is_doctor %}
+                    <a class="btn btn-outline-primary btn-sm" href="{% url 'orden_edit' o.id %}">
+                      <i class="bi bi-pencil-square me-1"></i>Editar
+                    </a>
+                    <form method="post" action="{% url 'orden_delete' o.id %}"
+                          onsubmit="return confirm('¿Eliminar medicamento de la receta?');">
+                      {% csrf_token %}
+                      <button class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-x-circle me-1"></i>Eliminar
+                      </button>
+                    </form>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -64,10 +121,12 @@
         <div class="text-secondary">Sin medicamentos aún.</div>
       {% endif %}
 
-      <div class="mt-3">
-        <a class="btn btn-outline-success btn-sm" href="{% url 'orden_create' rec.id %}">
-          <i class="bi bi-capsule-pill me-1"></i>Agregar medicamento
-        </a>
+      <div class="mt-3 d-flex gap-2">
+        {% if user|is_admin or user|is_doctor %}
+          <a class="btn btn-outline-success btn-sm" href="{% url 'orden_create' rec.id %}">
+            <i class="bi bi-capsule-pill me-1"></i>Agregar medicamento
+          </a>
+        {% endif %}
         <a class="btn btn-outline-secondary btn-sm" href="{% url 'registro_mensual' residente.id %}">
           <i class="bi bi-calendar3 me-1"></i>Registro mensual
         </a>
@@ -78,5 +137,6 @@
       <div class="text-secondary">Aún no tiene recetas. Crea la primera.</div>
     </div>
   {% endfor %}
+
 </div>
 {% endblock %}

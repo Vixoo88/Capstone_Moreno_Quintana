@@ -23,7 +23,7 @@ from .models import Asignacion, DiaAsignacion
 # arriba en views.py
 from .roles import (
     admin_required, cuidadora_or_admin_required, tens_or_admin_required, staff_view_required,
-    is_cuidadora, is_tens, is_admin,
+    is_cuidadora, is_tens, is_admin, doctor_or_admin_required, doctor_tens_or_admin_required,
     CUIDADORA_GROUP,
 )
 
@@ -197,7 +197,7 @@ def logout_view(request):
 # =========================================================
 
 @login_required
-@tens_or_admin_required
+@doctor_tens_or_admin_required
 def residente_list(request):
     qs = Residente.objects.filter(activo=True).order_by('nombre_completo')
     return render(request, 'residentes/residentes_list.html', {'residentes': qs})
@@ -215,19 +215,26 @@ def residente_create(request):
     return render(request, 'residentes/residente_form.html', {'form': form})
 
 @login_required
-@admin_required
+@doctor_or_admin_required
 def residente_detail(request, residente_id):
+    # Prefetch de recetas con el médico ya “pegado”
+    recetas_qs = (
+        Receta.objects
+        .select_related('medico')  # <<--- así podrás usar rec.medico en el template sin consultas extra
+        .order_by('-creada_en')
+        .prefetch_related(
+            Prefetch(
+                'ordenes',
+                queryset=OrdenMedicamento.objects
+                    .select_related('producto')  # optimiza producto
+                    .prefetch_related('horas')
+            )
+        )
+    )
+
     res = get_object_or_404(
         Residente.objects.prefetch_related(
-            Prefetch(
-                'recetas',
-                queryset=Receta.objects.order_by('-creada_en').prefetch_related(
-                    Prefetch(
-                        'ordenes',
-                        queryset=OrdenMedicamento.objects.prefetch_related('horas', 'producto')
-                    )
-                )
-            )
+            Prefetch('recetas', queryset=recetas_qs)
         ),
         pk=residente_id
     )
@@ -269,7 +276,7 @@ def residente_delete(request, residente_id):
 
 @login_required
 @transaction.atomic
-@admin_required
+@doctor_or_admin_required
 def receta_create(request, residente_id):
     res = get_object_or_404(Residente, pk=residente_id)
     receta_form = RecetaForm(request.POST or None)
@@ -324,7 +331,7 @@ def receta_create(request, residente_id):
     })
 
 @login_required
-@admin_required
+@doctor_or_admin_required
 def receta_delete(request, receta_id):
     receta = get_object_or_404(Receta, pk=receta_id)
     res_id = receta.residente_id
@@ -343,7 +350,7 @@ def receta_delete(request, receta_id):
 
 @login_required
 @transaction.atomic
-@admin_required
+@doctor_or_admin_required
 def orden_create(request, receta_id):
     receta = get_object_or_404(Receta, pk=receta_id)
     orden_form = OrdenMedicamentoForm(request.POST or None)
@@ -391,7 +398,7 @@ def orden_create(request, receta_id):
 
 @login_required
 @transaction.atomic
-@admin_required
+@doctor_or_admin_required
 def orden_edit(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento.objects.select_related('receta', 'producto'), pk=orden_id)
     orden_form = OrdenMedicamentoForm(request.POST or None, instance=orden)
@@ -440,7 +447,7 @@ def orden_edit(request, orden_id):
     })
 
 @login_required
-@admin_required
+@doctor_or_admin_required
 def orden_delete(request, orden_id):
     orden = get_object_or_404(OrdenMedicamento, pk=orden_id)
     res_id = orden.receta.residente_id
@@ -1284,3 +1291,121 @@ def medicamento_delete(request, producto_id):
     return render(request, "medicamentos/medicamento_confirm_delete.html", {
         "obj": p
     })
+
+
+
+
+# ALERTA PARA ASIGNACION CUIDADORES Y MENSAJES
+@login_required
+@require_http_methods(["POST"])
+@tens_or_admin_required
+@transaction.atomic
+def asignaciones_generar(request):
+    """Genera asignación equitativa y aleatoria para HOY usando la selección enviada
+    y envía un resumen al grupo de Telegram. SIEMPRE devuelve un redirect.
+    """
+    hoy = timezone.localdate()
+
+    # 1) Leer selección desde el formulario
+    ids_str = request.POST.getlist('cuidadores')  # checkboxes
+    try:
+        selected_ids = [int(x) for x in ids_str]
+    except ValueError:
+        selected_ids = []
+
+    # 2) Armar queryset de cuidadoras válidas (por grupo)
+    base_cuidadoras = User.objects.filter(is_active=True, groups__name=CUIDADORA_GROUP)
+    if selected_ids:
+        cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids)
+    else:
+        # si el usuario no marcó nada, tomamos todas
+        cuidadoras_qs = base_cuidadoras
+
+    cuidadoras = list(cuidadoras_qs.order_by('first_name', 'username'))
+
+    # 3) Guardar selección del día para persistirla
+    modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
+    modo.cuidadoras.set(cuidadoras_qs)  # persistimos la elección (puede ser vacío -> interpretado como "todas")
+
+    # 4) Residente activos y reparto
+    residentes = list(Residente.objects.filter(activo=True).order_by('nombre_completo'))
+
+    if not cuidadoras or not residentes:
+        messages.error(request, "Faltan cuidadoras seleccionadas o no hay residentes activos.")
+        return redirect('asignaciones_hoy')  # <-- RETURN
+
+    random.shuffle(residentes)  # aleatorio
+    Asignacion.objects.filter(fecha=hoy).delete()
+
+    bulk = []
+    for i, r in enumerate(residentes):
+        c = cuidadoras[i % len(cuidadoras)]  # reparto equitativo/round-robin
+        bulk.append(Asignacion(fecha=hoy, cuidadora=c, residente=r))
+    Asignacion.objects.bulk_create(bulk)
+
+    # ---- Telegram: resumen por persona ----
+    try:
+        asigns = (
+            Asignacion.objects
+            .select_related('cuidadora', 'residente')
+            .filter(fecha=hoy)
+            .order_by('cuidadora__first_name', 'cuidadora__username', 'residente__nombre_completo')
+        )
+
+        grupos = defaultdict(list)
+        for a in asigns:
+            name = (a.cuidadora.get_full_name() or a.cuidadora.username).strip()
+            grupos[name].append(a.residente.nombre_completo)
+
+        fecha_str = hoy.strftime("%d/%m/%Y")
+        title = "Asignación de personal"   # <- cambia a gusto
+        icon  = "🧑‍⚕️"                     # <- cambia a gusto
+        header = f"📣 <b>{title}</b>\n📅 {fecha_str}\n"
+
+        bloques = []
+        for persona, lista in grupos.items():
+            lines = "\n".join(f"• {nom}" for nom in lista)
+            bloques.append(f"\n{icon} <b>{persona}</b> ({len(lista)})\n{lines}")
+
+        ok = True
+        msg = header + "".join(bloques)
+        if len(msg) <= 3500:
+            ok = bool(send_telegram_message(msg))
+        else:
+            ok = bool(send_telegram_message(header))
+            for b in bloques:
+                ok = bool(send_telegram_message(b)) and ok
+
+        if ok:
+            messages.success(
+                request,
+                f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} personas. Aviso enviado a Telegram."
+            )
+        else:
+            messages.warning(
+                request,
+                f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} personas. "
+                "No se pudo enviar el aviso a Telegram."
+            )
+    except Exception as e:
+        # No romper el flujo si el envío falla
+        messages.warning(request, f"Asignación creada. No se pudo enviar el aviso a Telegram ({e}).")
+
+    return redirect('asignaciones_hoy')  # <-- RETURN FINAL, pase lo que pase
+
+
+# === NUEVO: aviso rápido de medicamentos listos ===
+@login_required
+@require_http_methods(["POST"])
+@tens_or_admin_required
+def asignaciones_avisar_meds(request):
+    hoy = timezone.localdate()
+    texto = (request.POST.get("mensaje") or "").strip()
+    if not texto:
+        texto = f"💊 Medicamentos de hoy ({hoy.strftime('%d/%m/%Y')}) están listos para retiro en Enfermería. Por favor pasar a buscar y administrar. Gracias."
+    ok = send_telegram_message(texto)
+    if ok:
+        messages.success(request, "Aviso enviado a Telegram.")
+    else:
+        messages.error(request, "No se pudo enviar el aviso a Telegram.")
+    return redirect('asignaciones_hoy')
