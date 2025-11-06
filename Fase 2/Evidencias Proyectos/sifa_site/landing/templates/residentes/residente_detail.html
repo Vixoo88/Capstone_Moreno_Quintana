@@ -9,14 +9,12 @@
     </h2>
 
     <div class="d-flex gap-2">
-      {# Nueva receta: admin o doctor #}
       {% if user|is_admin or user|is_doctor %}
         <a class="btn btn-gradient" href="{% url 'receta_create' residente.id %}">
           <i class="bi bi-prescription2 me-1"></i>Nueva receta
         </a>
       {% endif %}
 
-      {# Eliminar residente: solo admin #}
       {% if user|is_admin %}
         <form method="post" action="{% url 'residente_delete' residente.id %}"
               onsubmit="return confirm('¿Eliminar al residente y todas sus recetas? Esta acción no se puede deshacer.');"
@@ -34,10 +32,9 @@
     <div class="glass-card p-3 mb-3">
       <div class="d-flex align-items-center justify-content-between">
         <div class="fw-bold">
-          Receta #{{ rec.id }} · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}
+          Receta #{{ rec.numero|default:rec.id }} · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}
         </div>
 
-        {# Eliminar receta: admin o doctor #}
         {% if user|is_admin or user|is_doctor %}
           <form method="post" action="{% url 'receta_delete' rec.id %}" onsubmit="return confirm('¿Eliminar receta completa?');">
             {% csrf_token %}
@@ -48,7 +45,6 @@
         {% endif %}
       </div>
 
-      {# NUEVO: autor y fecha de creación #}
       <div class="mb-2">
         <span class="badge text-bg-light border small">
           <i class="bi bi-person-badge me-1"></i>

@@ -33,16 +33,32 @@ class Producto(models.Model):
 
 # --------- Receta y programación ----------
 class Receta(models.Model):
-    residente = models.ForeignKey(Residente, on_delete=models.CASCADE, related_name="recetas")
+    residente = models.ForeignKey('Residente', on_delete=models.CASCADE, related_name="recetas")
     medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    # NUEVO: número secuencial por residente
+    numero = models.PositiveIntegerField(
+        default=0, editable=False, help_text="Número secuencial por residente"
+    )
+
     inicio = models.DateField()
     fin = models.DateField(null=True, blank=True)
     observaciones = models.TextField(blank=True)
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            # Evita duplicados: para un mismo residente, cada número es único
+            models.UniqueConstraint(fields=['residente', 'numero'], name='uniq_receta_por_residente'),
+        ]
+        # Orden por defecto: la más reciente (número más alto) primero
+        ordering = ['-numero', '-creada_en']
+
     def __str__(self):
-        return f"Receta #{self.id} · {self.residente}"
+        # Muestra #numero si existe; si no, usa el ID como fallback
+        nro = self.numero or self.id
+        return f"Receta #{nro} · {self.residente}"
 
 
 class OrdenMedicamento(models.Model):

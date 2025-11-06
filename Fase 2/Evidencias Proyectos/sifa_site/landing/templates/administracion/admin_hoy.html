@@ -1,24 +1,75 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 980px;">
-  <h3 class="page-title mb-3">Administración de medicamentos — {{ hoy|date:"d/m/Y" }}</h3>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <h3 class="page-title mb-0">Administración de medicamentos — {{ hoy|date:"d/m/Y" }}</h3>
 
+    {# Botón para ver cuidadores asignados (abre offcanvas) #}
+    <button class="btn btn-outline-primary btn-sm"
+            type="button"
+            data-bs-toggle="offcanvas"
+            data-bs-target="#cuidadoresPanel">
+      <i class="bi bi-people me-1"></i>Asignados hoy
+    </button>
+  </div>
+
+  {# Buscador #}
+  <form method="get" class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    {% if seleccion %}
+      <input type="hidden" name="h" value="{{ seleccion }}">
+    {% endif %}
+    {% if cuid_selected %}
+      <input type="hidden" name="cuid" value="{{ cuid_selected.id }}">
+    {% endif %}
+    <div class="input-group input-group-sm" style="max-width: 380px;">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Buscar residente por nombre…">
+      {% if q or cuid_selected or seleccion %}
+        <a class="btn btn-outline-secondary" href="{% url 'admin_list_hoy' %}">Limpiar</a>
+      {% endif %}
+    </div>
+    <button class="btn btn-outline-primary btn-sm">Filtrar</button>
+
+    {% if cuid_selected %}
+      <span class="badge bg-primary-subtle text-primary border ms-2">
+        <i class="bi bi-person-heart me-1"></i>
+        {{ cuid_selected.get_full_name|default:cuid_selected.username }}
+        <a class="text-decoration-none ms-1"
+           href="{% url 'admin_list_hoy' %}{% if q or seleccion %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and seleccion %}&{% endif %}{% if seleccion %}h={{ seleccion }}{% endif %}">
+          ✕
+        </a>
+      </span>
+    {% endif %}
+  </form>
+
+  {# Chips por hora #}
   <div class="d-flex flex-wrap gap-2 mb-3">
     {% for h,c in horas %}
-      <a href="{% url 'admin_list_hoy' %}?h={{ h }}" class="chip {% if seleccion == h %}active{% endif %}">
+      <a href="{% url 'admin_list_hoy' %}?h={{ h }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if cuid_selected %}&cuid={{ cuid_selected.id }}{% endif %}"
+         class="chip {% if seleccion == h %}active{% endif %}">
         <i class="bi bi-clock me-1"></i>{{ h }} <span class="badge text-bg-light ms-1">{{ c }}</span>
       </a>
     {% endfor %}
     {% if seleccion %}
-      <a href="{% url 'admin_list_hoy' %}" class="chip"><i class="bi bi-ui-checks-grid me-1"></i>Ver todas</a>
+      <a href="{% url 'admin_list_hoy' %}{% if q or cuid_selected %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and cuid_selected %}&{% endif %}{% if cuid_selected %}cuid={{ cuid_selected.id }}{% endif %}"
+         class="chip">
+        <i class="bi bi-ui-checks-grid me-1"></i>Ver todas
+      </a>
     {% endif %}
   </div>
 
+  {# Grupos por hora #}
   {% for hora, items in grupos.items %}
+    {% with hora_id=hora|cut:":" %}
     <div class="glass-card mb-3">
-      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-        <strong><i class="bi bi-clock me-2"></i>Hora {{ hora }}</strong>
-        <form method="post" action="{% url 'admin_marcar_grupo' %}?h={{ hora }}">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <strong class="mb-0"><i class="bi bi-clock me-2"></i>Hora {{ hora }}</strong>
+
+        {# FORM GRUPO (desktop/tablet) #}
+        <form id="frmg-{{ hora_id }}"
+              method="post"
+              class="d-none d-sm-inline-block"
+              action="{% url 'admin_marcar_grupo' %}?h={{ hora }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if cuid_selected %}&cuid={{ cuid_selected.id }}{% endif %}">
           {% csrf_token %}
           <input type="hidden" name="hora" value="{{ hora }}">
           <div class="btn-group btn-group-sm">
@@ -27,29 +78,56 @@
             <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazar todos</button>
           </div>
         </form>
+
+        {# BOTÓN GRUPO (móvil) -> abre sheet inferior #}
+        <button type="button"
+                class="btn btn-success btn-sm d-sm-none w-100"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#actionSheet"
+                data-sheet-title="Hora {{ hora }}"
+                data-sheet-form="frmg-{{ hora_id }}">
+          <i class="bi bi-check2-circle me-1"></i>Marcar esta hora
+        </button>
       </div>
 
       <div class="list-group list-group-flush">
         {% for e in items %}
           <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-center">
-              <div class="me-3">
-                <div class="fw-semibold">{{ e.residente.nombre_completo }}</div>
-                <div class="text-muted small">{{ e.orden.producto.nombre }} {{ e.orden.producto.potencia }} — {{ e.orden.dosis }}</div>
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 item-row">
+              <div class="info flex-grow-1 min-w-0">
+                <div class="fw-semibold text-truncate">{{ e.residente.nombre_completo }}</div>
+                <div class="text-muted small med-line">
+                  {{ e.orden.producto.nombre }} {{ e.orden.producto.potencia }} — {{ e.orden.dosis }}
+                </div>
               </div>
 
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge badge-status {% if e.estado == 'DADA' %}text-bg-success{% elif e.estado == 'OMITIDA' %}text-bg-secondary{% elif e.estado == 'RECHAZADA' %}text-bg-danger{% else %}text-bg-dark{% endif %}">
+              <div class="actions d-flex align-items-center gap-2 flex-wrap w-100 w-sm-auto">
+                <span class="badge badge-status flex-shrink-0 {% if e.estado == 'DADA' %}text-bg-success{% elif e.estado == 'OMITIDA' %}text-bg-secondary{% elif e.estado == 'RECHAZADA' %}text-bg-danger{% else %}text-bg-dark{% endif %}">
                   {{ e.get_estado_display }}
                 </span>
-                <form method="post" action="{% url 'admin_marcar_rapido' e.id %}?h={{ hora }}">
+
+                {# FORM FILA (desktop/tablet) #}
+                <form id="frm-{{ e.id }}"
+                      method="post"
+                      class="d-none d-sm-inline-block ms-sm-0 ms-auto"
+                      action="{% url 'admin_marcar_rapido' e.id %}?h={{ hora }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if cuid_selected %}&cuid={{ cuid_selected.id }}{% endif %}">
                   {% csrf_token %}
                   <div class="btn-group btn-group-sm">
                     <button class="btn btn-success" name="estado" value="DADA">Dar</button>
-                    <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">Omitida</button>
-                    <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazada</button>
+                    <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">Omitir</button>
+                    <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazar</button>
                   </div>
                 </form>
+
+                {# BOTÓN FILA (móvil) -> abre sheet inferior #}
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm d-sm-none w-100"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="#actionSheet"
+                        data-sheet-title="{{ e.residente.nombre_completo|escape }}"
+                        data-sheet-form="frm-{{ e.id }}">
+                  Marcar
+                </button>
               </div>
             </div>
 
@@ -64,8 +142,120 @@
         {% endfor %}
       </div>
     </div>
+    {% endwith %}
   {% empty %}
     <div class="glass-card p-4 text-center text-secondary">No hay administraciones programadas para hoy.</div>
   {% endfor %}
 </div>
+
+{# Offcanvas con lista de cuidadores asignados hoy #}
+<div class="offcanvas offcanvas-end" tabindex="-1" id="cuidadoresPanel" aria-labelledby="cuidadoresLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="cuidadoresLabel">Cuidadores asignados hoy</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body">
+    {% if cuid_list %}
+      <div class="list-group">
+        {% for it in cuid_list %}
+          {% with id=it.cuidadora_id nombre=it.cuidadora__first_name|default:it.cuidadora__username %}
+            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+               href="{% url 'admin_list_hoy' %}?cuid={{ id }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if seleccion %}&h={{ seleccion }}{% endif %}">
+              <span class="text-truncate">
+                {{ it.cuidadora__first_name }} {{ it.cuidadora__last_name }}
+                {% if not it.cuidadora__first_name %}{{ it.cuidadora__username }}{% endif %}
+              </span>
+              <span class="badge bg-secondary">{{ it.n }}</span>
+            </a>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">No hay asignaciones hoy.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# Offcanvas bottom: ACTION SHEET para móvil #}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="actionSheet" aria-labelledby="actionSheetLabel" style="height:auto;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="actionSheetLabel">Marcar</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="d-grid gap-2">
+      {# Estos botones ENVÍAN el form indicado dinámicamente vía atributo "form" #}
+      <button id="sheetDar"      type="submit" class="btn btn-success btn-lg">Dar</button>
+      <button id="sheetOmitir"   type="submit" class="btn btn-outline-secondary btn-lg">Omitir</button>
+      <button id="sheetRechazar" type="submit" class="btn btn-outline-danger btn-lg">Rechazar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Claves anti-solapamiento para flex */
+  .min-w-0 { min-width: 0 !important; }
+  .item-row { flex-wrap: wrap; }
+  .actions { justify-content: flex-end; }
+  @media (max-width: 575.98px) {
+    .actions { justify-content: stretch; }
+  }
+  .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Línea del medicamento: no desbordar en móvil (máx 2 líneas con “…”) */
+  .med-line{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  @media (max-width: 575.98px){
+    .med-line{
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      hyphens: auto;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  /* Action sheet look */
+  #actionSheet .offcanvas-header { border-bottom: 1px solid rgba(0,0,0,.08); }
+  #actionSheet .btn { padding-top: .75rem; padding-bottom: .75rem; }
+</style>
+
+{% block extra_js %}
+<script>
+  // Action sheet móvil: enlaza los botones al form que corresponda
+  (function(){
+    const sheetEl = document.getElementById('actionSheet');
+    const titleEl = document.getElementById('actionSheetLabel');
+    const btnDar = document.getElementById('sheetDar');
+    const btnOmitir = document.getElementById('sheetOmitir');
+    const btnRechazar = document.getElementById('sheetRechazar');
+
+    sheetEl.addEventListener('show.bs.offcanvas', function (ev) {
+      const trigger = ev.relatedTarget; // botón que abrió el sheet
+      const formId = trigger?.getAttribute('data-sheet-form') || '';
+      const title  = trigger?.getAttribute('data-sheet-title') || 'Marcar';
+
+      titleEl.textContent = title;
+
+      // Reasignar el form objetivo
+      [btnDar, btnOmitir, btnRechazar].forEach(b => {
+        b.removeAttribute('form');
+        if (formId) b.setAttribute('form', formId);
+      });
+
+      // Seteamos el name/value de estado
+      btnDar.setAttribute('name', 'estado');      btnDar.setAttribute('value', 'DADA');
+      btnOmitir.setAttribute('name', 'estado');   btnOmitir.setAttribute('value', 'OMITIDA');
+      btnRechazar.setAttribute('name', 'estado'); btnRechazar.setAttribute('value', 'RECHAZADA');
+    });
+  })();
+</script>
+{% endblock %}
 {% endblock %}

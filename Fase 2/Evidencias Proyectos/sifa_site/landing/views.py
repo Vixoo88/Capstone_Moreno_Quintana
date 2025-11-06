@@ -20,6 +20,8 @@ import random
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_http_methods
 from .models import Asignacion, DiaAsignacion
+from django.db.models import Max
+from django.db.models import Count
 # arriba en views.py
 from .roles import (
     admin_required, cuidadora_or_admin_required, tens_or_admin_required, staff_view_required,
@@ -151,10 +153,22 @@ def home_public(request):
 @login_required
 @staff_view_required
 def dashboard(request):
-    hoy = timezone.localdate()
-    admins_hoy = Administracion.objects.filter(programada_para__date=hoy).count()
+    # Asegura que existan los eventos de hoy (idempotente)
+    _generar_eventos_hoy()
 
-    # Alertas de stock crítico
+    # Rango del día local (00:00:00 a 23:59:59.999999)
+    hoy = timezone.localdate()
+    inicio = timezone.make_aware(datetime.combine(hoy, dtime.min))
+    fin    = timezone.make_aware(datetime.combine(hoy, dtime.max))
+
+    # Conteo robusto de administraciones de hoy
+    admins_hoy = (
+        Administracion.objects
+        .filter(programada_para__range=(inicio, fin))
+        .count()
+    )
+
+    # Alertas de stock crítico (igual que antes)
     criticos = (
         OrdenMedicamento.objects
         .select_related('receta__residente', 'producto')
@@ -199,8 +213,28 @@ def logout_view(request):
 @login_required
 @doctor_tens_or_admin_required
 def residente_list(request):
-    qs = Residente.objects.filter(activo=True).order_by('nombre_completo')
-    return render(request, 'residentes/residentes_list.html', {'residentes': qs})
+    q = (request.GET.get("q") or "").strip()
+    sexo = (request.GET.get("sexo") or "").upper()  # "M", "F", "O" o ""
+
+    qs = Residente.objects.filter(activo=True)
+
+    if q:
+        qs = qs.filter(
+            Q(nombre_completo__icontains=q) |
+            Q(rut__icontains=q)
+        )
+
+    if sexo in ("M", "F", "O"):
+        qs = qs.filter(sexo=sexo)
+
+    qs = qs.order_by("nombre_completo")
+
+    return render(request, "residentes/residentes_list.html", {
+        "residentes": qs,
+        "q": q,
+        "sexo": sexo,
+        "total": qs.count(),
+    })
 
 @login_required
 @admin_required
@@ -296,25 +330,39 @@ def receta_create(request, residente_id):
             error_producto = "Selecciona un medicamento o completa 'Nuevo medicamento'."
 
         if base_ok and not error_horas and not error_producto:
-            receta = receta_form.save(commit=False)
-            receta.residente = res
-            receta.medico = request.user
-            receta.save()
+            with transaction.atomic():
+                # Crear receta y asignar número secuencial por residente
+                receta = receta_form.save(commit=False)
+                receta.residente = res
+                receta.medico = request.user
 
-            producto = prod_sel or producto_form.create_if_filled()
-
-            orden = orden_form.save(commit=False)
-            orden.receta = receta
-            orden.producto = producto
-            orden.save()
-            _check_alerta_stock(orden)
-
-            for item in horas_data:
-                HoraProgramada.objects.create(
-                    orden=orden, hora=item['hora'], dia_semana=item['dia']
+                # Bloquea filas del residente para evitar colisiones y calcula el siguiente número
+                max_num = (
+                    Receta.objects
+                    .select_for_update()
+                    .filter(residente=res)
+                    .aggregate(m=Max('numero'))['m'] or 0
                 )
+                receta.numero = max_num + 1
+                receta.save()
 
-            messages.success(request, 'Receta creada correctamente.')
+                # Producto (existente o nuevo)
+                producto = prod_sel or producto_form.create_if_filled()
+
+                # Orden
+                orden = orden_form.save(commit=False)
+                orden.receta = receta
+                orden.producto = producto
+                orden.save()
+                _check_alerta_stock(orden)
+
+                # Horas
+                for item in horas_data:
+                    HoraProgramada.objects.create(
+                        orden=orden, hora=item['hora'], dia_semana=item['dia']
+                    )
+
+            messages.success(request, f'Receta #{receta.numero} creada correctamente.')
             return redirect('residente_detail', residente_id=res.id)
 
         messages.error(request, 'No se pudo guardar la receta. Revisa los errores.')
@@ -500,21 +548,62 @@ def admin_list_hoy(request):
     _generar_eventos_hoy()
     hoy = timezone.localdate()
 
+    q = (request.GET.get("q") or "").strip()
+    selected = request.GET.get("h")
+    cuid_param = request.GET.get("cuid")  # id de cuidadora/o seleccionado
+
+    # Asignaciones de hoy (para construir lista y filtrar)
+    asigns_qs = (
+        Asignacion.objects
+        .select_related('cuidadora')
+        .filter(fecha=hoy)
+    )
+
+    # Lista de cuidadores asignados hoy con conteo de residentes
+    cuid_list = (
+        asigns_qs.values(
+            'cuidadora_id',
+            'cuidadora__first_name',
+            'cuidadora__last_name',
+            'cuidadora__username'
+        )
+        .annotate(n=Count('id'))
+        .order_by('cuidadora__first_name', 'cuidadora__username')
+    )
+
     eventos_qs = (
-        Administracion.objects.select_related("orden__producto", "residente", "realizada_por")
+        Administracion.objects
+        .select_related("orden__producto", "residente", "realizada_por")
         .filter(programada_para__date=hoy)
     )
 
-    # Modo del día
+    # Respeta "solo_asignados" para cuidadoras (modo del día)
     modo = DiaAsignacion.objects.filter(fecha=hoy).first()
     if modo and modo.solo_asignados and is_cuidadora(request.user):
-        # residentes asignados a esta cuidadora hoy
-        res_ids = list(Asignacion.objects.filter(fecha=hoy, cuidadora=request.user).values_list('residente_id', flat=True))
+        res_ids = list(asigns_qs.filter(cuidadora=request.user).values_list('residente_id', flat=True))
         eventos_qs = eventos_qs.filter(residente_id__in=res_ids)
 
-    # (resto de la agrupación por horas igual que ya tenías)
-    buckets = defaultdict(list)
-    counts = defaultdict(int)
+    # Filtro por cuidadora/o elegido
+    cuid_selected = None
+    if cuid_param:
+        try:
+            cuid_id = int(cuid_param)
+        except (TypeError, ValueError):
+            cuid_id = None
+
+        if cuid_id:
+            # Admin/TENS pueden ver cualquiera; cuidadora solo a sí misma
+            if is_admin(request.user) or is_tens(request.user) or (is_cuidadora(request.user) and request.user.id == cuid_id):
+                res_ids = list(asigns_qs.filter(cuidadora_id=cuid_id).values_list('residente_id', flat=True))
+                eventos_qs = eventos_qs.filter(residente_id__in=res_ids)
+                cuid_selected = User.objects.filter(id=cuid_id).first()
+
+    # Búsqueda por nombre
+    if q:
+        eventos_qs = eventos_qs.filter(residente__nombre_completo__icontains=q)
+
+    # Agrupación por hora HH:MM
+    buckets, counts = defaultdict(list), defaultdict(int)
     for e in eventos_qs:
         hhmm = timezone.localtime(e.programada_para).strftime("%H:%M")
         buckets[hhmm].append(e)
@@ -523,13 +612,10 @@ def admin_list_hoy(request):
     def keyf(h): return (int(h[:2]), int(h[3:5]))
     horas_sorted = sorted(counts.keys(), key=keyf)
 
-    selected = request.GET.get('h')
     if selected:
-        grupos = {selected: sorted(buckets.get(selected, []),
-                                   key=lambda x: x.residente.nombre_completo)}
+        grupos = {selected: sorted(buckets.get(selected, []), key=lambda x: x.residente.nombre_completo)}
     else:
-        grupos = {h: sorted(buckets[h], key=lambda x: x.residente.nombre_completo)
-                  for h in horas_sorted}
+        grupos = {h: sorted(buckets[h], key=lambda x: x.residente.nombre_completo) for h in horas_sorted}
 
     horas = [(h, counts[h]) for h in horas_sorted]
 
@@ -538,6 +624,9 @@ def admin_list_hoy(request):
         'hoy': hoy,
         'horas': horas,
         'seleccion': selected,
+        'q': q,
+        'cuid_list': list(cuid_list),
+        'cuid_selected': cuid_selected,
     })
 
 @login_required
@@ -1049,53 +1138,111 @@ def asignaciones_hoy(request):
         'solo_asignados': modo.solo_asignados,
     })
 
+from collections import defaultdict
+from datetime import datetime, time as dtime
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.db import transaction
+from django.shortcuts import redirect
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
+
 @login_required
 @require_http_methods(["POST"])
 @tens_or_admin_required
 @transaction.atomic
 def asignaciones_generar(request):
-    """Genera asignación equitativa y aleatoria para HOY usando la selección de cuidadoras enviada."""
+    """
+    Genera asignación SOLO para residentes que tienen administraciones HOY.
+    Si no hay candidatos, no se crea nada.
+    """
     hoy = timezone.localdate()
+    _generar_eventos_hoy()  # idempotente
 
-    # 1) Leer selección desde el formulario
-    ids_str = request.POST.getlist('cuidadores')  # checkboxes
+    # --- límites del día en tz local ---
+    inicio_dia = timezone.make_aware(datetime.combine(hoy, dtime.min))
+    fin_dia    = timezone.make_aware(datetime.combine(hoy, dtime.max))
+    ahora      = timezone.now()
+
+    # Cambia esta bandera si quieres considerar SOLO lo que queda en el día
+    SOLO_DESDE_AHORA = True
+
+    # 1) Cuidadores seleccionados (o todos los activos del grupo)
+    ids_str = request.POST.getlist('cuidadores')
     try:
         selected_ids = [int(x) for x in ids_str]
-    except ValueError:
+    except (TypeError, ValueError):
         selected_ids = []
 
-    # 2) Armar queryset de cuidadoras válidas (por grupo)
     base_cuidadoras = User.objects.filter(is_active=True, groups__name=CUIDADORA_GROUP)
-    if selected_ids:
-        cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids)
-    else:
-        # si el usuario no marcó nada, tomamos todas
-        cuidadoras_qs = base_cuidadoras
-
+    cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids) if selected_ids else base_cuidadoras
     cuidadoras = list(cuidadoras_qs.order_by('first_name', 'username'))
 
-    # 3) Guardar selección del día para persistirla
     modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
-    modo.cuidadoras.set(cuidadoras_qs)  # persistimos la elección (puede ser vacío -> interpretado como "todas" en la vista)
+    modo.cuidadoras.set(cuidadoras_qs)
 
-    # 4) Residente activos y reparto
-    residentes = list(Residente.objects.filter(activo=True).order_by('nombre_completo'))
-
-    if not cuidadoras or not residentes:
-        messages.error(request, "Faltan cuidadoras seleccionadas o no hay residentes activos.")
+    if not cuidadoras:
+        messages.error(request, "No hay cuidadores seleccionados/activos.")
         return redirect('asignaciones_hoy')
 
-    random.shuffle(residentes)  # aleatorio
+    # 2) Residente con administraciones HOY (estricto)
+    # Opción A: todo el día
+    filtro_tiempo = {'programada_para__range': (inicio_dia, fin_dia)}
+    # Opción B: solo lo que queda del día
+    if SOLO_DESDE_AHORA:
+        filtro_tiempo = {'programada_para__range': (ahora, fin_dia)}
+
+    # primero intentamos con PENDIENTES
+    res_ids_pend = list(
+        Administracion.objects
+        .filter(estado=Administracion.Estado.PENDIENTE, **filtro_tiempo)
+        .values_list('residente_id', flat=True)
+        .distinct()
+    )
+
+    if res_ids_pend:
+        effective_res_ids = res_ids_pend
+    else:
+        # si no hay pendientes, tomamos cualquiera HOY (o desde ahora, según bandera)
+        effective_res_ids = list(
+            Administracion.objects
+            .filter(**filtro_tiempo)
+            .values_list('residente_id', flat=True)
+            .distinct()
+        )
+
+    if not effective_res_ids:
+        Asignacion.objects.filter(fecha=hoy).delete()
+        messages.warning(request, "Hoy no hay residentes con administraciones (vigentes) para asignar.")
+        return redirect('asignaciones_hoy')
+
+    residentes = list(
+        Residente.objects.filter(id__in=effective_res_ids, activo=True).order_by('nombre_completo')
+    )
+
+    if not residentes:
+        Asignacion.objects.filter(fecha=hoy).delete()
+        messages.warning(request, "No hay residentes activos con administraciones hoy.")
+        return redirect('asignaciones_hoy')
+
+    # 3) Reparto equitativo SOLO entre 'residentes'
+    import random
+    random.shuffle(residentes)
     Asignacion.objects.filter(fecha=hoy).delete()
 
     bulk = []
     for i, r in enumerate(residentes):
-        c = cuidadoras[i % len(cuidadoras)]  # reparto equitativo/round-robin
+        c = cuidadoras[i % len(cuidadoras)]
         bulk.append(Asignacion(fecha=hoy, cuidadora=c, residente=r))
     Asignacion.objects.bulk_create(bulk)
 
-    messages.success(request, f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} cuidadoras.")
+    # 4) Mensaje final (sin Telegram, para simplificar el debug)
+    messages.success(
+        request,
+        f"Asignados {len(residentes)} residentes entre {len(cuidadoras)} cuidador(es)."
+    )
     return redirect('asignaciones_hoy')
+
 
 @login_required
 @require_http_methods(["POST"])
@@ -1301,49 +1448,85 @@ def medicamento_delete(request, producto_id):
 @tens_or_admin_required
 @transaction.atomic
 def asignaciones_generar(request):
-    """Genera asignación equitativa y aleatoria para HOY usando la selección enviada
-    y envía un resumen al grupo de Telegram. SIEMPRE devuelve un redirect.
+    """
+    Genera asignación SOLO para residentes que tienen administraciones HOY
+    (prioriza PENDIENTES; si no hay, toma cualquiera hoy). Si no hay candidatos, no reparte.
     """
     hoy = timezone.localdate()
+    _generar_eventos_hoy()  # asegura que existan admins de hoy (idempotente)
 
-    # 1) Leer selección desde el formulario
-    ids_str = request.POST.getlist('cuidadores')  # checkboxes
+    # Límites del día en TZ local
+    inicio_dia = timezone.make_aware(datetime.combine(hoy, dtime.min))
+    fin_dia    = timezone.make_aware(datetime.combine(hoy, dtime.max))
+
+    # Si quieres ignorar admins ya pasadas, deja esto en True
+    SOLO_DESDE_AHORA = True
+    ahora = timezone.now()
+    rango = (ahora, fin_dia) if SOLO_DESDE_AHORA else (inicio_dia, fin_dia)
+
+    # 1) Cuidadores seleccionados (o todos los activos del grupo)
+    ids_str = request.POST.getlist('cuidadores')
     try:
         selected_ids = [int(x) for x in ids_str]
-    except ValueError:
+    except (TypeError, ValueError):
         selected_ids = []
 
-    # 2) Armar queryset de cuidadoras válidas (por grupo)
     base_cuidadoras = User.objects.filter(is_active=True, groups__name=CUIDADORA_GROUP)
-    if selected_ids:
-        cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids)
-    else:
-        # si el usuario no marcó nada, tomamos todas
-        cuidadoras_qs = base_cuidadoras
-
+    cuidadoras_qs = base_cuidadoras.filter(id__in=selected_ids) if selected_ids else base_cuidadoras
     cuidadoras = list(cuidadoras_qs.order_by('first_name', 'username'))
 
-    # 3) Guardar selección del día para persistirla
+    # Persistir selección del día
     modo, _ = DiaAsignacion.objects.get_or_create(fecha=hoy, defaults={'solo_asignados': False})
-    modo.cuidadoras.set(cuidadoras_qs)  # persistimos la elección (puede ser vacío -> interpretado como "todas")
+    modo.cuidadoras.set(cuidadoras_qs)
 
-    # 4) Residente activos y reparto
-    residentes = list(Residente.objects.filter(activo=True).order_by('nombre_completo'))
+    if not cuidadoras:
+        messages.error(request, "No hay cuidadores seleccionados/activos.")
+        return redirect('asignaciones_hoy')
 
-    if not cuidadoras or not residentes:
-        messages.error(request, "Faltan cuidadoras seleccionadas o no hay residentes activos.")
-        return redirect('asignaciones_hoy')  # <-- RETURN
+    # 2) SOLO residentes con administraciones HOY (prioriza PENDIENTES)
+    res_ids_pend = list(
+        Administracion.objects
+        .filter(programada_para__range=rango, estado=Administracion.Estado.PENDIENTE)
+        .values_list('residente_id', flat=True)
+        .distinct()
+    )
+    if res_ids_pend:
+        effective_res_ids = res_ids_pend
+        preferencia = "pendientes"
+    else:
+        res_ids_any = list(
+            Administracion.objects
+            .filter(programada_para__range=rango)
+            .values_list('residente_id', flat=True)
+            .distinct()
+        )
+        effective_res_ids = res_ids_any
+        preferencia = "con administración hoy"
 
-    random.shuffle(residentes)  # aleatorio
+    if not effective_res_ids:
+        Asignacion.objects.filter(fecha=hoy).delete()
+        messages.warning(request, "Hoy no hay residentes con administraciones (vigentes) para asignar.")
+        return redirect('asignaciones_hoy')
+
+    residentes = list(
+        Residente.objects.filter(id__in=effective_res_ids, activo=True).order_by('nombre_completo')
+    )
+    if not residentes:
+        Asignacion.objects.filter(fecha=hoy).delete()
+        messages.warning(request, "No hay residentes activos con administraciones hoy.")
+        return redirect('asignaciones_hoy')
+
+    # 3) Reparto equitativo solo sobre los candidatos
+    random.shuffle(residentes)
     Asignacion.objects.filter(fecha=hoy).delete()
 
     bulk = []
     for i, r in enumerate(residentes):
-        c = cuidadoras[i % len(cuidadoras)]  # reparto equitativo/round-robin
+        c = cuidadoras[i % len(cuidadoras)]
         bulk.append(Asignacion(fecha=hoy, cuidadora=c, residente=r))
     Asignacion.objects.bulk_create(bulk)
 
-    # ---- Telegram: resumen por persona ----
+    # 4) Telegram (si quieres mantener el resumen)
     try:
         asigns = (
             Asignacion.objects
@@ -1351,24 +1534,20 @@ def asignaciones_generar(request):
             .filter(fecha=hoy)
             .order_by('cuidadora__first_name', 'cuidadora__username', 'residente__nombre_completo')
         )
-
         grupos = defaultdict(list)
         for a in asigns:
             name = (a.cuidadora.get_full_name() or a.cuidadora.username).strip()
             grupos[name].append(a.residente.nombre_completo)
 
         fecha_str = hoy.strftime("%d/%m/%Y")
-        title = "Asignación de personal"   # <- cambia a gusto
-        icon  = "🧑‍⚕️"                     # <- cambia a gusto
-        header = f"📣 <b>{title}</b>\n📅 {fecha_str}\n"
-
+        header = f"📣 <b>Asignación de personal</b>\n📅 {fecha_str}\n"
         bloques = []
         for persona, lista in grupos.items():
             lines = "\n".join(f"• {nom}" for nom in lista)
-            bloques.append(f"\n{icon} <b>{persona}</b> ({len(lista)})\n{lines}")
+            bloques.append(f"\n🧑‍⚕️ <b>{persona}</b> ({len(lista)})\n{lines}")
 
-        ok = True
         msg = header + "".join(bloques)
+        ok = True
         if len(msg) <= 3500:
             ok = bool(send_telegram_message(msg))
         else:
@@ -1377,21 +1556,13 @@ def asignaciones_generar(request):
                 ok = bool(send_telegram_message(b)) and ok
 
         if ok:
-            messages.success(
-                request,
-                f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} personas. Aviso enviado a Telegram."
-            )
+            messages.success(request, f"Se asignaron {len(residentes)} residentes {preferencia} entre {len(cuidadoras)} personas. Aviso enviado a Telegram.")
         else:
-            messages.warning(
-                request,
-                f"Se asignaron {len(residentes)} residentes entre {len(cuidadoras)} personas. "
-                "No se pudo enviar el aviso a Telegram."
-            )
+            messages.warning(request, f"Se asignaron {len(residentes)} residentes {preferencia} entre {len(cuidadoras)} personas. (No se pudo enviar el aviso a Telegram).")
     except Exception as e:
-        # No romper el flujo si el envío falla
         messages.warning(request, f"Asignación creada. No se pudo enviar el aviso a Telegram ({e}).")
 
-    return redirect('asignaciones_hoy')  # <-- RETURN FINAL, pase lo que pase
+    return redirect('asignaciones_hoy')
 
 
 # === NUEVO: aviso rápido de medicamentos listos ===

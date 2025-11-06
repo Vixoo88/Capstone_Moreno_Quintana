@@ -1,12 +1,54 @@
 {% extends 'base.html' %}
+{% load roles_tags %}
 {% block content %}
 <div class="container py-4">
+
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="page-title mb-0">Residentes</h2>
-    <a class="btn btn-gradient" href="{% url 'residente_create' %}">
-      <i class="bi bi-person-plus me-1"></i> Nuevo residente
-    </a>
+
+    {% if user|is_admin %}
+      <a class="btn btn-gradient" href="{% url 'residente_create' %}">
+        <i class="bi bi-person-plus me-1"></i> Nuevo residente
+      </a>
+    {% endif %}
   </div>
+
+  {# Filtros #}
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-12 col-sm-6 col-md-5 col-lg-4">
+      <label class="form-label small">Buscar</label>
+      <input type="search" name="q" value="{{ q }}" class="form-control"
+             placeholder="Nombre o RUT…">
+    </div>
+
+    <div class="col-6 col-sm-3 col-md-3 col-lg-2">
+      <label class="form-label small">Sexo</label>
+      <select name="sexo" class="form-select" onchange="this.form.submit()">
+        <option value="" {% if not sexo %}selected{% endif %}>Todos</option>
+        <option value="F" {% if sexo == 'F' %}selected{% endif %}>Femenino</option>
+        <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
+        <option value="O" {% if sexo == 'O' %}selected{% endif %}>Otro / No especificado</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-sm-3 col-md-2 col-lg-2">
+      <label class="form-label d-none d-sm-block">&nbsp;</label>
+      <button class="btn btn-outline-secondary w-100">
+        <i class="bi bi-search me-1"></i> Filtrar
+      </button>
+    </div>
+
+    {% if q or sexo %}
+      <div class="col-12 col-sm-auto">
+        <label class="form-label d-none d-sm-block">&nbsp;</label>
+        <a class="btn btn-link" href="{% url 'residente_list' %}">Limpiar</a>
+      </div>
+    {% endif %}
+  </form>
+
+  {% if total is not None %}
+    <div class="small text-secondary mb-2">{{ total }} resultado{{ total|pluralize }}</div>
+  {% endif %}
 
   {% if residentes %}
     <div class="row g-3">
@@ -14,11 +56,20 @@
         <div class="col-md-6 col-lg-4">
           <div class="glass-card p-3 h-100">
             <div class="d-flex align-items-start justify-content-between">
-              <div>
-                <div class="fw-bold">{{ r.nombre_completo }}</div>
-                {% if r.rut %}<div class="small text-secondary">RUT: {{ r.rut }}</div>{% endif %}
+              <div class="me-2">
+                <div class="fw-bold text-truncate">{{ r.nombre_completo }}</div>
+                {% if r.rut %}
+                  <div class="small text-secondary">RUT: {{ r.rut }}</div>
+                {% endif %}
+                {% if r.sexo %}
+                  <div class="small text-muted">{{ r.get_sexo_display }}</div>
+                {% endif %}
               </div>
-              <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+              {% if r.activo %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+              {% else %}
+                <span class="badge bg-secondary">Inactivo</span>
+              {% endif %}
             </div>
             <a class="stretched-link" href="{% url 'residente_detail' r.id %}"></a>
           </div>
@@ -27,7 +78,7 @@
     </div>
   {% else %}
     <div class="glass-card p-4 text-center">
-      <div class="text-secondary">Aún no hay residentes.</div>
+      <div class="text-secondary">No se encontraron residentes con esos filtros.</div>
     </div>
   {% endif %}
 </div>
