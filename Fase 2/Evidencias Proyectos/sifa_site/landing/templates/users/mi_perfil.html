@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width: 780px;">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:40px;height:40px;">
+        <i class="bi bi-person-circle text-primary"></i>
+      </div>
+      <div>
+        <h3 class="mb-0">Mi perfil</h3>
+        <p class="small text-secondary mb-0">
+          Revisa y actualiza tus datos de acceso a KIBEN.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass-card p-3 p-md-4">
+    {# MENSAJES DE ERRORES GENERALES #}
+    {% if profile_form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for e in profile_form.non_field_errors %}{{ e }}<br>{% endfor %}
+      </div>
+    {% endif %}
+    {% if password_form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for e in password_form.non_field_errors %}{{ e }}<br>{% endfor %}
+      </div>
+    {% endif %}
+
+    {# === DATOS DE CUENTA === #}
+    <form method="post" novalidate class="mb-4">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="profile">
+
+      <fieldset class="mb-2">
+        <legend class="fs-6 text-uppercase text-secondary mb-2">
+          <i class="bi bi-person-gear me-1"></i> Datos de la cuenta
+        </legend>
+
+        <div class="row g-3 row-cols-1 row-cols-md-2">
+          <div class="col">
+            <label class="form-label mb-1">Nombre de usuario</label>
+            {{ profile_form.username }}
+            {% for e in profile_form.username.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+            <div class="form-text">
+              Este es el usuario con el que iniciarás sesión.
+            </div>
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">Correo electrónico</label>
+            {{ profile_form.email }}
+            {% for e in profile_form.email.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">Nombre</label>
+            {{ profile_form.first_name }}
+            {% for e in profile_form.first_name.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col">
+            <label class="form-label mb-1">Apellidos</label>
+            {{ profile_form.last_name }}
+            {% for e in profile_form.last_name.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" name="btn_profile">
+          <i class="bi bi-check2 me-1"></i> Guardar datos
+        </button>
+      </div>
+    </form>
+
+    <hr class="my-3">
+
+    {# === CAMBIAR CONTRASEÑA === #}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="password">
+
+      <fieldset class="mb-2">
+        <legend class="fs-6 text-uppercase text-secondary mb-2">
+          <i class="bi bi-key me-1"></i> Cambiar contraseña
+        </legend>
+
+        <p class="small text-muted">
+          Usa esta sección para reemplazar la contraseña temporal que te entregó la Enfermera.
+        </p>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label mb-1">Contraseña actual</label>
+            {{ password_form.old_password }}
+            {% for e in password_form.old_password.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label mb-1">Nueva contraseña</label>
+            {{ password_form.new_password1 }}
+            {% for e in password_form.new_password1.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label mb-1">Confirmar nueva contraseña</label>
+            {{ password_form.new_password2 }}
+            {% for e in password_form.new_password2.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if password_form.help_text %}
+          <div class="form-text mt-2 small">
+            {{ password_form.help_text|safe }}
+          </div>
+        {% endif %}
+      </fieldset>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-outline-primary" name="btn_password">
+          <i class="bi bi-shield-lock me-1"></i> Actualizar contraseña
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<style>
+  .glass-card{
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(6px);
+  }
+  .form-label{ font-weight: 600; }
+  input[type="text"], input[type="email"], input[type="password"],
+  select, textarea{ width:100%; }
+</style>
+{% endblock %}

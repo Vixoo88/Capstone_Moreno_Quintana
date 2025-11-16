@@ -8,44 +8,57 @@
       <i class="bi bi-person-vcard me-2"></i>{{ residente.nombre_completo }}
     </h2>
 
-    <div class="d-flex gap-2">
-      {% if user|is_admin or user|is_doctor %}
+    <div class="d-flex flex-wrap gap-2 justify-content-end">
+      {# SOLO DOCTOR puede crear nuevos tratamientos #}
+      {% if user|is_doctor %}
         <a class="btn btn-gradient" href="{% url 'receta_create' residente.id %}">
-          <i class="bi bi-prescription2 me-1"></i>Nueva receta
+          <i class="bi bi-prescription2 me-1"></i>Nuevo tratamiento
         </a>
       {% endif %}
 
-      {% if user|is_admin %}
-        <form method="post" action="{% url 'residente_delete' residente.id %}"
-              onsubmit="return confirm('¿Eliminar al residente y todas sus recetas? Esta acción no se puede deshacer.');"
+      {# ÚNICO botón de registro mensual (ambos lo ven) #}
+      <a class="btn btn-outline-secondary" href="{% url 'registro_mensual' residente.id %}">
+        <i class="bi bi-calendar3 me-1"></i>Registro mensual
+      </a>
+
+      {# Enfermera/Admin: marcar residente como INACTIVO (no eliminar) #}
+      {% if user|is_admin and residente.activo %}
+        <form method="post"
+              action="{% url 'residente_delete' residente.id %}"
+              onsubmit="return confirm('¿Marcar al residente como INACTIVO? No se eliminarán sus datos ni sus tratamientos.');"
               class="d-inline">
           {% csrf_token %}
           <button class="btn btn-outline-danger">
-            <i class="bi bi-trash3 me-1"></i>Eliminar
+            <i class="bi bi-slash-circle me-1"></i>Marcar inactivo
           </button>
         </form>
       {% endif %}
     </div>
   </div>
 
+  {# fecha de hoy en formato Y-m-d para comparar con inicio/fin #}
+  {% now "Y-m-d" as hoy %}
+
   {% for rec in residente.recetas.all %}
     <div class="glass-card p-3 mb-3">
       <div class="d-flex align-items-center justify-content-between">
         <div class="fw-bold">
-          Receta #{{ rec.numero|default:rec.id }} · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}
+          Tratamiento #{{ rec.numero|default:rec.id }}
+          · {{ rec.inicio|date:"d/m/Y" }}{% if rec.fin %} — {{ rec.fin|date:"d/m/Y" }}{% endif %}
         </div>
 
-        {% if user|is_admin or user|is_doctor %}
-          <form method="post" action="{% url 'receta_delete' rec.id %}" onsubmit="return confirm('¿Eliminar receta completa?');">
-            {% csrf_token %}
-            <button class="btn btn-outline-danger btn-sm">
-              <i class="bi bi-trash3 me-1"></i>Eliminar
-            </button>
-          </form>
+        {# Botón editar fechas SOLO DOCTOR #}
+        {% if user|is_doctor %}
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  data-bs-toggle="modal"
+                  data-bs-target="#modalFechas{{ rec.id }}">
+            <i class="bi bi-calendar-range me-1"></i>Editar fechas
+          </button>
         {% endif %}
       </div>
 
-      <div class="mb-2">
+      <div class="mb-2 d-flex flex-wrap gap-1 align-items-center">
         <span class="badge text-bg-light border small">
           <i class="bi bi-person-badge me-1"></i>
           {% if rec.medico %}
@@ -54,15 +67,26 @@
             —
           {% endif %}
         </span>
+
         {% if rec.creada_en %}
           <span class="badge text-bg-light border small">
             <i class="bi bi-clock-history me-1"></i>{{ rec.creada_en|date:"d/m/Y H:i" }}
           </span>
         {% endif %}
-        {% if rec.activa is not None %}
-          <span class="badge {% if rec.activa %}text-bg-success-subtle text-success{% else %}text-bg-secondary{% endif %} border small">
-            {% if rec.activa %} Activa {% else %} Inactiva {% endif %}
-          </span>
+
+        {# Badge de Activa / Inactiva según fechas #}
+        {% if rec.fin %}
+          {% if rec.inicio|date:"Y-m-d" <= hoy and rec.fin|date:"Y-m-d" >= hoy %}
+            <span class="badge text-bg-success-subtle text-success border small ms-1">Activa</span>
+          {% else %}
+            <span class="badge text-bg-secondary border small ms-1">Inactiva</span>
+          {% endif %}
+        {% else %}
+          {% if rec.inicio|date:"Y-m-d" <= hoy %}
+            <span class="badge text-bg-success-subtle text-success border small ms-1">Activa</span>
+          {% else %}
+            <span class="badge text-bg-secondary border small ms-1">Inactiva</span>
+          {% endif %}
         {% endif %}
       </div>
 
@@ -74,8 +98,10 @@
         <div class="list-group list-group-flush">
           {% for o in rec.ordenes.all %}
             <div class="list-group-item">
-              <div class="d-flex align-items-center justify-content-between">
-                <div>
+              <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-2">
+
+                {# INFO DEL MEDICAMENTO #}
+                <div class="flex-grow-1">
                   <div class="fw-semibold">
                     {{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}
                   </div>
@@ -89,26 +115,64 @@
                     {% if o.indicaciones %} · {{ o.indicaciones }}{% endif %}
                   </div>
 
-                  <div class="small mt-1">
-                    <span class="badge text-bg-light border">Stock: {{ o.stock_asignado }}</span>
-                    <span class="badge text-bg-light border">Crítico: {{ o.stock_critico }}</span>
-                  </div>
+                  {# STOCK: SOLO ENFERMERA/ADMIN LO VE Y LO EDITA #}
+                  {% if user|is_admin %}
+                    <form method="post"
+                          action=""
+                          class="mt-2 d-flex flex-wrap gap-2 align-items-end">
+                      {% csrf_token %}
+                      <input type="hidden" name="accion" value="actualizar_stock">
+                      <input type="hidden" name="orden_id" value="{{ o.id }}">
+
+                      <div class="small text-muted w-100">
+                        <i class="bi bi-box-seam me-1"></i>Stock
+                      </div>
+
+                      <div class="input-group input-group-sm" style="max-width: 180px;">
+                        <span class="input-group-text">Asignado</span>
+                        <input type="number"
+                               name="stock_asignado"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               value="{{ o.stock_asignado }}">
+                      </div>
+
+                      <div class="input-group input-group-sm" style="max-width: 180px;">
+                        <span class="input-group-text">Crítico</span>
+                        <input type="number"
+                               name="stock_critico"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               value="{{ o.stock_critico }}">
+                      </div>
+
+                      <button class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-save me-1"></i>Guardar stock
+                      </button>
+                    </form>
+                  {% endif %}
                 </div>
 
-                <div class="d-flex gap-2">
-                  {% if user|is_admin or user|is_doctor %}
-                    <a class="btn btn-outline-primary btn-sm" href="{% url 'orden_edit' o.id %}">
-                      <i class="bi bi-pencil-square me-1"></i>Editar
+                {# ACCIONES SOLO DOCTOR (no enfermera) #}
+                {% if user|is_doctor %}
+                  <div class="d-flex flex-wrap gap-2 ms-md-2">
+                    <a class="btn btn-outline-primary btn-sm"
+                       href="{% url 'orden_edit' o.id %}">
+                      <i class="bi bi-pencil-square me-1"></i>Editar medicamento
                     </a>
-                    <form method="post" action="{% url 'orden_delete' o.id %}"
+
+                    <form method="post"
+                          action="{% url 'orden_delete' o.id %}"
                           onsubmit="return confirm('¿Eliminar medicamento de la receta?');">
                       {% csrf_token %}
                       <button class="btn btn-outline-danger btn-sm">
                         <i class="bi bi-x-circle me-1"></i>Eliminar
                       </button>
                     </form>
-                  {% endif %}
-                </div>
+                  </div>
+                {% endif %}
               </div>
             </div>
           {% endfor %}
@@ -117,20 +181,69 @@
         <div class="text-secondary">Sin medicamentos aún.</div>
       {% endif %}
 
-      <div class="mt-3 d-flex gap-2">
-        {% if user|is_admin or user|is_doctor %}
+      {# Solo el DOCTOR puede agregar medicamentos a un tratamiento #}
+      {% if user|is_doctor %}
+        <div class="mt-3">
           <a class="btn btn-outline-success btn-sm" href="{% url 'orden_create' rec.id %}">
             <i class="bi bi-capsule-pill me-1"></i>Agregar medicamento
           </a>
-        {% endif %}
-        <a class="btn btn-outline-secondary btn-sm" href="{% url 'registro_mensual' residente.id %}">
-          <i class="bi bi-calendar3 me-1"></i>Registro mensual
-        </a>
-      </div>
+        </div>
+      {% endif %}
     </div>
+
+    {# Modal para editar solo fecha de inicio y fin (SOLO DOCTOR) #}
+    {% if user|is_doctor %}
+      <div class="modal fade" id="modalFechas{{ rec.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                <i class="bi bi-calendar-range me-2"></i>
+                Editar fechas del tratamiento #{{ rec.numero|default:rec.id }}
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <form method="post" action="">
+              {% csrf_token %}
+              <input type="hidden" name="receta_id" value="{{ rec.id }}">
+              <input type="hidden" name="accion" value="editar_fechas">
+
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Fecha de inicio</label>
+                  <input type="date"
+                         name="inicio"
+                         class="form-control"
+                         value="{{ rec.inicio|date:'Y-m-d' }}">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Fecha de término</label>
+                  <input type="date"
+                         name="fin"
+                         class="form-control"
+                         value="{% if rec.fin %}{{ rec.fin|date:'Y-m-d' }}{% endif %}">
+                  <div class="form-text">Puedes dejarla vacía si el tratamiento no tiene fecha de término.</div>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                  Cancelar
+                </button>
+                <button type="submit" class="btn btn-gradient">
+                  <i class="bi bi-save me-1"></i>Guardar cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
   {% empty %}
     <div class="glass-card p-4 text-center">
-      <div class="text-secondary">Aún no tiene recetas. Crea la primera.</div>
+      <div class="text-secondary">Aún no tiene recetas registradas.</div>
     </div>
   {% endfor %}
 

@@ -1,61 +1,104 @@
 {% extends 'base.html' %}
+{% load roles_tags %}
 {% block content %}
 <div class="container py-4" style="max-width: 980px;">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-    <h3 class="page-title mb-0">Administración de medicamentos — {{ hoy|date:"d/m/Y" }}</h3>
 
-    {# Botón para ver cuidadores asignados (abre offcanvas) #}
-    <button class="btn btn-outline-primary btn-sm"
-            type="button"
-            data-bs-toggle="offcanvas"
-            data-bs-target="#cuidadoresPanel">
-      <i class="bi bi-people me-1"></i>Asignados hoy
-    </button>
+  {# Encabezado principal #}
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:40px;height:40px;">
+        <i class="bi bi-capsule-pill text-primary"></i>
+      </div>
+      <div>
+        <h2 class="page-title mb-0">
+          Administración de medicamentos
+        </h2>
+        <p class="small text-secondary mb-0">
+          Hoy: <strong>{{ hoy|date:"d/m/Y" }}</strong>
+        </p>
+      </div>
+    </div>
+
+    {# Botón para ver cuidadores asignados (solo ADMIN) #}
+    {% if request.user|is_admin %}
+      <button class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#cuidadoresPanel">
+        <i class="bi bi-people"></i>
+        <span>Asignados hoy</span>
+      </button>
+    {% endif %}
   </div>
 
-  {# Buscador #}
-  <form method="get" class="mb-3 d-flex flex-wrap gap-2 align-items-center">
-    {% if seleccion %}
-      <input type="hidden" name="h" value="{{ seleccion }}">
-    {% endif %}
-    {% if cuid_selected %}
-      <input type="hidden" name="cuid" value="{{ cuid_selected.id }}">
-    {% endif %}
-    <div class="input-group input-group-sm" style="max-width: 380px;">
-      <span class="input-group-text"><i class="bi bi-search"></i></span>
-      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Buscar residente por nombre…">
-      {% if q or cuid_selected or seleccion %}
-        <a class="btn btn-outline-secondary" href="{% url 'admin_list_hoy' %}">Limpiar</a>
+  {# FILTROS + CHIPS HORA en una tarjeta #}
+  <div class="glass-card p-3 mb-3">
+    {# Buscador #}
+    <form method="get" class="row g-2 align-items-end mb-2">
+      {% if seleccion %}
+        <input type="hidden" name="h" value="{{ seleccion }}">
+      {% endif %}
+      {% if cuid_selected %}
+        <input type="hidden" name="cuid" value="{{ cuid_selected.id }}">
+      {% endif %}
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small text-secondary">Buscar residente</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="search"
+                 name="q"
+                 value="{{ q }}"
+                 class="form-control"
+                 placeholder="Nombre del residente…">
+          {% if q or cuid_selected or seleccion %}
+            <a class="btn btn-outline-secondary" href="{% url 'admin_list_hoy' %}">Limpiar</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label d-none d-md-block small">&nbsp;</label>
+        <button class="btn btn-outline-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+      </div>
+
+      {# Chip de cuidadora filtrada (solo habrá valor para ADMIN) #}
+      {% if cuid_selected %}
+        <div class="col-12 col-md-4">
+          <label class="form-label small text-secondary">Filtrado por cuidador/a</label>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="badge bg-primary-subtle text-primary border">
+              <i class="bi bi-person-heart me-1"></i>
+              {{ cuid_selected.get_full_name|default:cuid_selected.username }}
+            </span>
+            <a class="small text-decoration-none"
+               href="{% url 'admin_list_hoy' %}{% if q or seleccion %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and seleccion %}&{% endif %}{% if seleccion %}h={{ seleccion }}{% endif %}">
+              Quitar filtro ✕
+            </a>
+          </div>
+        </div>
+      {% endif %}
+    </form>
+
+    {# Chips por hora #}
+    <div class="d-flex flex-wrap gap-2">
+      {% for h,c in horas %}
+        <a href="{% url 'admin_list_hoy' %}?h={{ h }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if cuid_selected %}&cuid={{ cuid_selected.id }}{% endif %}"
+           class="chip {% if seleccion == h %}active{% endif %}">
+          <i class="bi bi-clock me-1"></i>{{ h }}
+          <span class="badge text-bg-light ms-1">{{ c }}</span>
+        </a>
+      {% endfor %}
+      {% if seleccion %}
+        <a href="{% url 'admin_list_hoy' %}{% if q or cuid_selected %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and cuid_selected %}&{% endif %}{% if cuid_selected %}cuid={{ cuid_selected.id }}{% endif %}"
+           class="chip">
+          <i class="bi bi-ui-checks-grid me-1"></i>Ver todas
+        </a>
       {% endif %}
     </div>
-    <button class="btn btn-outline-primary btn-sm">Filtrar</button>
-
-    {% if cuid_selected %}
-      <span class="badge bg-primary-subtle text-primary border ms-2">
-        <i class="bi bi-person-heart me-1"></i>
-        {{ cuid_selected.get_full_name|default:cuid_selected.username }}
-        <a class="text-decoration-none ms-1"
-           href="{% url 'admin_list_hoy' %}{% if q or seleccion %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and seleccion %}&{% endif %}{% if seleccion %}h={{ seleccion }}{% endif %}">
-          ✕
-        </a>
-      </span>
-    {% endif %}
-  </form>
-
-  {# Chips por hora #}
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    {% for h,c in horas %}
-      <a href="{% url 'admin_list_hoy' %}?h={{ h }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if cuid_selected %}&cuid={{ cuid_selected.id }}{% endif %}"
-         class="chip {% if seleccion == h %}active{% endif %}">
-        <i class="bi bi-clock me-1"></i>{{ h }} <span class="badge text-bg-light ms-1">{{ c }}</span>
-      </a>
-    {% endfor %}
-    {% if seleccion %}
-      <a href="{% url 'admin_list_hoy' %}{% if q or cuid_selected %}?{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% if q and cuid_selected %}&{% endif %}{% if cuid_selected %}cuid={{ cuid_selected.id }}{% endif %}"
-         class="chip">
-        <i class="bi bi-ui-checks-grid me-1"></i>Ver todas
-      </a>
-    {% endif %}
   </div>
 
   {# Grupos por hora #}
@@ -63,7 +106,12 @@
     {% with hora_id=hora|cut:":" %}
     <div class="glass-card mb-3">
       <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <strong class="mb-0"><i class="bi bi-clock me-2"></i>Hora {{ hora }}</strong>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge text-bg-light border">
+            <i class="bi bi-clock me-1"></i>{{ hora }}
+          </span>
+          <strong class="mb-0">Administraciones de esta hora</strong>
+        </div>
 
         {# FORM GRUPO (desktop/tablet) #}
         <form id="frmg-{{ hora_id }}"
@@ -73,9 +121,15 @@
           {% csrf_token %}
           <input type="hidden" name="hora" value="{{ hora }}">
           <div class="btn-group btn-group-sm">
-            <button class="btn btn-success" name="estado" value="DADA"><i class="bi bi-check2-all me-1"></i>Dar todos</button>
-            <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">Omitir todos</button>
-            <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">Rechazar todos</button>
+            <button class="btn btn-success" name="estado" value="DADA">
+              <i class="bi bi-check2-all me-1"></i>Dar todos
+            </button>
+            <button class="btn btn-outline-secondary" name="estado" value="OMITIDA">
+              Omitir todos
+            </button>
+            <button class="btn btn-outline-danger" name="estado" value="RECHAZADA">
+              Rechazar todos
+            </button>
           </div>
         </form>
 
@@ -102,7 +156,11 @@
               </div>
 
               <div class="actions d-flex align-items-center gap-2 flex-wrap w-100 w-sm-auto">
-                <span class="badge badge-status flex-shrink-0 {% if e.estado == 'DADA' %}text-bg-success{% elif e.estado == 'OMITIDA' %}text-bg-secondary{% elif e.estado == 'RECHAZADA' %}text-bg-danger{% else %}text-bg-dark{% endif %}">
+                <span class="badge badge-status flex-shrink-0
+                            {% if e.estado == 'DADA' %}text-bg-success
+                            {% elif e.estado == 'OMITIDA' %}text-bg-secondary
+                            {% elif e.estado == 'RECHAZADA' %}text-bg-danger
+                            {% else %}text-bg-dark{% endif %}">
                   {{ e.get_estado_display }}
                 </span>
 
@@ -133,7 +191,8 @@
 
             {% if e.estado != 'PENDIENTE' and e.realizada_por %}
               <div class="mt-2 text-muted small">
-                por {{ e.realizada_por.get_full_name|default:e.realizada_por.username }} · {{ e.programada_para|date:"H:i" }}
+                por {{ e.realizada_por.get_full_name|default:e.realizada_por.username }}
+                · {{ e.programada_para|date:"H:i" }}
               </div>
             {% endif %}
           </div>
@@ -144,11 +203,15 @@
     </div>
     {% endwith %}
   {% empty %}
-    <div class="glass-card p-4 text-center text-secondary">No hay administraciones programadas para hoy.</div>
+    <div class="glass-card p-4 text-center text-secondary">
+      <i class="bi bi-clipboard-x me-1"></i>
+      No hay administraciones programadas para hoy.
+    </div>
   {% endfor %}
 </div>
 
-{# Offcanvas con lista de cuidadores asignados hoy #}
+{# Offcanvas con lista de cuidadores asignados hoy (SOLO ADMIN) #}
+{% if request.user|is_admin %}
 <div class="offcanvas offcanvas-end" tabindex="-1" id="cuidadoresPanel" aria-labelledby="cuidadoresLabel">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title" id="cuidadoresLabel">Cuidadores asignados hoy</h5>
@@ -175,6 +238,7 @@
     {% endif %}
   </div>
 </div>
+{% endif %}
 
 {# Offcanvas bottom: ACTION SHEET para móvil #}
 <div class="offcanvas offcanvas-bottom" tabindex="-1" id="actionSheet" aria-labelledby="actionSheetLabel" style="height:auto;">
@@ -193,7 +257,6 @@
 </div>
 
 <style>
-  /* Claves anti-solapamiento para flex */
   .min-w-0 { min-width: 0 !important; }
   .item-row { flex-wrap: wrap; }
   .actions { justify-content: flex-end; }
@@ -202,7 +265,7 @@
   }
   .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Línea del medicamento: no desbordar en móvil (máx 2 líneas con “…”) */
+  /* Línea del medicamento para evitar desbordes en móvil */
   .med-line{
     white-space: nowrap;
     overflow: hidden;
@@ -222,7 +285,6 @@
     }
   }
 
-  /* Action sheet look */
   #actionSheet .offcanvas-header { border-bottom: 1px solid rgba(0,0,0,.08); }
   #actionSheet .btn { padding-top: .75rem; padding-bottom: .75rem; }
 </style>
@@ -250,7 +312,7 @@
         if (formId) b.setAttribute('form', formId);
       });
 
-      // Seteamos el name/value de estado
+      // Setear name/value de estado
       btnDar.setAttribute('name', 'estado');      btnDar.setAttribute('value', 'DADA');
       btnOmitir.setAttribute('name', 'estado');   btnOmitir.setAttribute('value', 'OMITIDA');
       btnRechazar.setAttribute('name', 'estado'); btnRechazar.setAttribute('value', 'RECHAZADA');

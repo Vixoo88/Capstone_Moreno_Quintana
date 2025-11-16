@@ -3,7 +3,10 @@
 {% block content %}
 <div class="container py-4" style="max-width: 980px;">
   <div class="glass-card p-4 shadow-soft">
-    <h3 class="page-title mb-3"><i class="bi bi-capsule-pill me-2"></i>{% if modo_edicion %}Editar{% else %}Agregar{% endif %} medicamento — Receta #{{ receta.id }}</h3>
+    <h3 class="page-title mb-3">
+      <i class="bi bi-capsule-pill me-2"></i>
+      {% if modo_edicion %}Editar{% else %}Agregar{% endif %} medicamento
+    </h3>
 
     {% if error_horas or error_producto or orden_form.errors %}
       <div class="alert alert-danger">
@@ -18,29 +21,39 @@
       <div class="card border-0 mb-3">
         <div class="card-header bg-transparent fw-bold d-flex justify-content-between">
           <span>Medicamento</span>
-          <div class="form-check form-switch">
+          {# El switch solo se muestra al agregar, no al editar #}
+          <div class="form-check form-switch {% if modo_edicion %}d-none{% endif %}">
             <input class="form-check-input" type="checkbox" id="toggleNuevo">
             <label class="form-check-label" for="toggleNuevo">Crear nuevo</label>
           </div>
         </div>
         <div class="card-body">
+          {# BLOQUE: seleccionar medicamento existente #}
           <div id="bloqueSelect">
             <label class="form-label">Seleccionar existente</label>
             {{ orden_form.producto }}
             <div class="row mt-3">
-              <div class="col-md-6">{{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}</div>
-              <div class="col-md-3">{{ orden_form.via.label_tag }} {{ orden_form.via }}</div>
-              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">{{ orden_form.activo }} {{ orden_form.activo.label_tag }}</div>
+              <div class="col-md-6">
+                {{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}
+              </div>
+              <div class="col-md-3">
+                {{ orden_form.via.label_tag }} {{ orden_form.via }}
+              </div>
+              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">
+                {{ orden_form.activo }} {{ orden_form.activo.label_tag }}
+              </div>
             </div>
-            <div class="row mt-2">
-              <div class="col-md-3"><label class="form-label">Stock asignado</label>{{ orden_form.stock_asignado }}</div>
-              <div class="col-md-3"><label class="form-label">Stock crítico</label>{{ orden_form.stock_critico }}</div>
+
+            <div class="mt-3">
+              {{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}
             </div>
-            <div class="mt-3">{{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}</div>
           </div>
 
+          {# BLOQUE: crear medicamento nuevo #}
           <div id="bloqueNuevo" class="d-none">
-            <div class="alert alert-info py-2 mb-3">Completa solo si el medicamento no existe.</div>
+            <div class="alert alert-info py-2 mb-3">
+              Completa solo si el medicamento no existe.
+            </div>
             <div class="row g-3">
               <div class="col-md-5 position-relative">
                 <label class="form-label">Nombre</label>
@@ -52,28 +65,45 @@
                      data-url="{% url 'api_productos_suggest' %}"></div>
                 <div class="form-text">Escribe al menos 2 letras para ver sugerencias.</div>
               </div>
-              <div class="col-md-3"><label class="form-label">Potencia</label>{{ producto_form.potencia }}</div>
-              <div class="col-md-4"><label class="form-label">Forma</label>{{ producto_form.forma }}</div>
+              <div class="col-md-3">
+                <label class="form-label">Potencia</label>
+                {{ producto_form.potencia }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Forma</label>
+                {{ producto_form.forma }}
+              </div>
             </div>
             <hr class="my-3">
             <div class="row">
-              <div class="col-md-6">{{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}</div>
-              <div class="col-md-3">{{ orden_form.via.label_tag }} {{ orden_form.via }}</div>
-              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">{{ orden_form.activo }} {{ orden_form.activo.label_tag }}</div>
+              <div class="col-md-6">
+                {{ orden_form.dosis.label_tag }} {{ orden_form.dosis }}
+              </div>
+              <div class="col-md-3">
+                {{ orden_form.via.label_tag }} {{ orden_form.via }}
+              </div>
+              <div class="col-md-3 d-flex align-items-center gap-2 mt-4 mt-md-0">
+                {{ orden_form.activo }} {{ orden_form.activo.label_tag }}
+              </div>
             </div>
-            <div class="row mt-2">
-              <div class="col-md-3"><label class="form-label">Stock asignado</label>{{ orden_form.stock_asignado }}</div>
-              <div class="col-md-3"><label class="form-label">Stock crítico</label>{{ orden_form.stock_critico }}</div>
+
+            <div class="mt-3">
+              {{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}
             </div>
-            <div class="mt-3">{{ orden_form.indicaciones.label_tag }} {{ orden_form.indicaciones }}</div>
           </div>
+
+          {# Campos ocultos: stock y crítico (no se muestran en pantalla) #}
+          {{ orden_form.stock_asignado.as_hidden }}
+          {{ orden_form.stock_critico.as_hidden }}
         </div>
       </div>
 
       <div class="card border-0 mb-3">
         <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
           <span class="fw-bold">Horas de administración</span>
-          <button type="button" class="btn btn-sm btn-gradient" id="btnAddHora"><i class="bi bi-plus-circle me-1"></i>Agregar hora</button>
+          <button type="button" class="btn btn-sm btn-gradient" id="btnAddHora">
+            <i class="bi bi-plus-circle me-1"></i>Agregar hora
+          </button>
         </div>
         <div class="card-body">
           <div id="horasContainer" class="d-grid gap-2">
@@ -97,7 +127,11 @@
                       <option value="6" {% if item.dia == 6 %}selected{% endif %}>Dom</option>
                     </select>
                   </div>
-                  <div class="ms-auto"><button type="button" class="btn btn-sm btn-outline-danger btnRemove"><i class="bi bi-x-lg"></i></button></div>
+                  <div class="ms-auto">
+                    <button type="button" class="btn btn-sm btn-outline-danger btnRemove">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
                 </div>
               {% endfor %}
             {% else %}
@@ -124,17 +158,24 @@
                   <option value="6">Dom</option>
                 </select>
               </div>
-              <div class="ms-auto"><button type="button" class="btn btn-sm btn-outline-danger btnRemove"><i class="bi bi-x-lg"></i></button></div>
+              <div class="ms-auto">
+                <button type="button" class="btn btn-sm btn-outline-danger btnRemove">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
             </div>
           </template>
 
-          {% if error_horas %}<div class="text-danger mt-2">{{ error_horas }}</div>{% endif %}
+          {% if error_horas %}
+            <div class="text-danger mt-2">{{ error_horas }}</div>
+          {% endif %}
         </div>
       </div>
 
       <div class="text-end">
         <button class="btn btn-gradient">
-          <i class="bi bi-save me-1"></i>{% if modo_edicion %}Guardar cambios{% else %}Agregar{% endif %}
+          <i class="bi bi-save me-1"></i>
+          {% if modo_edicion %}Guardar cambios{% else %}Agregar{% endif %}
         </button>
       </div>
     </form>

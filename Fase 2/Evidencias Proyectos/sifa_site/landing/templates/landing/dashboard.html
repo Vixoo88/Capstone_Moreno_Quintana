@@ -1,100 +1,292 @@
 {% extends 'base.html' %}
 {% load roles_tags %}
 {% block content %}
-<div class="container py-4">
-  <h2 class="page-title mb-4">Panel</h2>
+<div class="container py-4" style="max-width: 1100px;">
 
-  <div class="row g-4">
-    <!-- Tarjeta: Administraciones de hoy -->
-    <div class="col-lg-4">
-      <div class="glass-card p-4 h-100">
-        <div class="d-flex align-items-center justify-content-between">
+  {# Fecha bonita para mostrar en los textos #}
+  {% now "d/m/Y" as today_str %}
+
+  {% if user|is_doctor %}
+    {# ====================== VISTA ESPECIAL DOCTOR ====================== #}
+    <div class="glass-card p-4 mb-4">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-8">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            {# Avatar genérico de usuario #}
+            <div class="rounded-circle bg-info-subtle d-flex align-items-center justify-content-center" style="width:60px;height:60px;">
+              <i class="bi bi-person-fill text-info" style="font-size: 32px;"></i>
+            </div>
+            <div>
+              <h2 class="mb-1 fw-bold">
+                Bienvenido(a),
+                <span class="text-primary">
+                  {{ user.get_full_name|default:user.username }}
+                </span>
+              </h2>
+              <p class="text-secondary mb-0 small">
+                Gracias por acompañar la salud de nuestros residentes. Aquí tienes accesos rápidos a lo que más vas a usar en KIBEN.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 d-flex flex-wrap gap-2">
+            <span class="badge text-bg-light border small">
+              <i class="bi bi-calendar-day me-1"></i>Hoy es {{ today_str }}
+            </span>
+          </div>
+        </div>
+        <div class="col-md-4 text-md-end">
+          <i class="bi bi-heart-pulse-fill text-danger" style="font-size: 52px; opacity:.5;"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-people fs-3 text-primary me-2"></i>
+            <h5 class="mb-0">Residentes</h5>
+          </div>
+          <p class="small text-secondary mb-3">
+            Revisa la ficha clínica, antecedentes y tratamientos activos de cada residente.
+          </p>
+          <a href="{% url 'residente_list' %}" class="btn btn-outline-primary btn-sm w-100">
+            Ver residentes
+          </a>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="glass-card p-3 h-100">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-prescription2 fs-3 text-success me-2"></i>
+            <h5 class="mb-0">Tratamientos</h5>
+          </div>
+          <p class="small text-secondary mb-3">
+            Crea nuevas recetas, ajusta fechas y deja observaciones para el equipo.
+          </p>
+          <a href="{% url 'residente_list' %}" class="btn btn-outline-success btn-sm w-100">
+            Gestionar tratamientos
+          </a>
+        </div>
+      </div>
+    </div>
+
+  {% elif user|is_cuidadora %}
+    {# ====================== VISTA ESPECIAL CUIDADORA ====================== #}
+    {# OJO: para cuidadora, admins_hoy debería venir del view como "sus" administraciones #}
+
+    <div class="glass-card p-4 mb-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center" style="width:60px;height:60px;">
+            <i class="bi bi-person-heart text-primary" style="font-size: 32px;"></i>
+          </div>
           <div>
-            <div class="h6 text-secondary">Administraciones de hoy</div>
-            <div class="display-5 fw-bold">{{ admins_hoy }}</div>
+            <h2 class="mb-1 fw-bold">
+              Hola, <span class="text-primary">{{ user.get_full_name|default:user.username }}</span> 👋
+            </h2>
+            <p class="text-secondary mb-0 small">
+              Este es tu panel de KIBEN. Aquí ves solo las administraciones que tienes asignadas para hoy.
+            </p>
           </div>
-          <i class="bi bi-clipboard2-check text-primary" style="font-size:52px"></i>
         </div>
-        <a class="btn btn-gradient mt-3 w-100" href="{% url 'admin_list_hoy' %}">
-          <i class="bi bi-capsule-pill me-2"></i>Ir a administrar
-        </a>
+        <div class="d-flex flex-column align-items-start align-items-md-end gap-1">
+          <span class="badge text-bg-light border small">
+            <i class="bi bi-calendar-day me-1"></i>Hoy: {{ today_str }}
+          </span>
+          <span class="badge text-bg-light border small">
+            <i class="bi bi-clipboard2-check me-1"></i>{{ admins_hoy }} administraciones asignadas a ti
+          </span>
+        </div>
       </div>
     </div>
 
-    <!-- Tarjeta: Alertas de stock crítico -->
-    <div class="col-lg-8">
-      <div class="glass-card p-4">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <div class="h6 text-secondary mb-0">Alertas de stock crítico</div>
-          {% if criticos %}<span class="badge bg-danger">{{ criticos|length }}</span>{% endif %}
-        </div>
-
-        {# Aviso solo para cuidadoras: lectura sin acciones #}
-        {% if request.user|is_cuidadora and criticos %}
-          <div class="alert alert-warning py-2 mb-3">
-            <i class="bi bi-exclamation-triangle me-1"></i>
-            Tienes acceso de solo lectura aquí. Si ves una alerta, avisa a una TENS o un administrador para reponer stock.
-          </div>
-        {% endif %}
-
-        {% if criticos %}
-          <div class="list-group list-group-flush">
-            {% for o in criticos %}
-              <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <div class="fw-semibold">{{ o.receta.residente.nombre_completo }}</div>
-                  <div class="text-muted small">
-                    {{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}
-                  </div>
-                  <div class="small">
-                    Stock: <span class="fw-bold">{{ o.stock_asignado }}</span>
-                    · Crítico: {{ o.stock_critico }}
-                  </div>
-                </div>
-
-                {# Acciones: Admin o TENS pueden reponer #}
-                {% if request.user|is_admin or request.user|is_tens %}
-                  <form method="post" action="{% url 'orden_restock' o.id %}"
-                        class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                    {% csrf_token %}
-                    <div class="input-group input-group-sm" style="width: 220px;">
-                      <input type="number" name="sumar" min="1" class="form-control" placeholder="+ unidades">
-                      <button class="btn btn-success">
-                        <i class="bi bi-plus-circle me-1"></i>Reponer
-                      </button>
-                    </div>
-                    <div class="d-flex gap-1">
-                      <button class="btn btn-outline-secondary btn-sm quick-add" data-add="5" type="button">+5</button>
-                      <button class="btn btn-outline-secondary btn-sm quick-add" data-add="10" type="button">+10</button>
-                      <button class="btn btn-outline-secondary btn-sm quick-add" data-add="30" type="button">+30</button>
-                    </div>
-                  </form>
-                {% else %}
-                  <div class="d-flex flex-column align-items-end text-end">
-                    <span class="badge bg-danger-subtle text-danger border border-danger small">
-                      <i class="bi bi-exclamation-octagon me-1"></i>Stock crítico
-                    </span>
-                    <small class="text-muted mt-1">Contactar a TENS/Administrador para reponer</small>
-                  </div>
-                {% endif %}
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="h6 text-secondary">Mis administraciones de hoy</div>
+              <div class="display-5 fw-bold">{{ admins_hoy }}</div>
+              <div class="small text-muted mt-1">
+                Registros de medicamentos que debes administrar tú en la fecha de hoy.
               </div>
-            {% endfor %}
+            </div>
+            <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center" style="width:70px;height:70px;">
+              <i class="bi bi-clipboard2-check text-primary" style="font-size: 34px;"></i>
+            </div>
           </div>
-        {% else %}
-          <div class="text-secondary">Todo en orden. No hay alertas de stock.</div>
-        {% endif %}
+          <a class="btn btn-gradient mt-3 w-100" href="{% url 'admin_list_hoy' %}">
+            <i class="bi bi-capsule-pill me-2"></i>Ir a mis administraciones
+          </a>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="glass-card p-4 h-100 d-flex flex-column justify-content-center text-center text-secondary">
+          <i class="bi bi-info-circle mb-2" style="font-size: 32px;"></i>
+          <p class="mb-1">
+            El stock de medicamentos es gestionado por Enfermería y TENS.
+          </p>
+          <p class="small mb-0">
+            Si notas que falta un medicamento o ves algún problema al administrar, avisa a una Enfermera o TENS.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
+
+  {% else %}
+    {# ====================== DASHBOARD PARA ADMIN / TENS (NO DOCTOR, NO CUIDADORA) ====================== #}
+
+    <div class="glass-card p-4 mb-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center" style="width:60px;height:60px;">
+            <i class="bi bi-person-fill text-primary" style="font-size: 32px;"></i>
+          </div>
+          <div>
+            <h2 class="mb-1 fw-bold">
+              Hola, <span class="text-primary">{{ user.get_full_name|default:user.username }}</span> 👋
+            </h2>
+            <p class="text-secondary mb-0 small">
+              Este es tu panel de KIBEN. Desde aquí puedes ver las administraciones del día y el estado del stock de medicamentos.
+            </p>
+          </div>
+        </div>
+        <div class="d-flex flex-column align-items-start align-items-md-end gap-1">
+          <span class="badge text-bg-light border small">
+            <i class="bi bi-calendar-day me-1"></i>Hoy: {{ today_str }}
+          </span>
+          {% if admins_hoy %}
+            <span class="badge text-bg-light border small">
+              <i class="bi bi-clipboard2-check me-1"></i>{{ admins_hoy }} administraciones programadas
+            </span>
+          {% endif %}
+          {% if criticos %}
+            <span class="badge bg-danger-subtle text-danger border small">
+              <i class="bi bi-exclamation-octagon me-1"></i>{{ criticos|length }} alertas de stock
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Tarjeta: Administraciones de hoy -->
+      <div class="col-lg-4">
+        <div class="glass-card p-4 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="h6 text-secondary">Administraciones de hoy</div>
+              <div class="display-5 fw-bold">{{ admins_hoy }}</div>
+              <div class="small text-muted mt-1">
+                Medicamentos que deben ser administrados en la fecha de hoy.
+              </div>
+            </div>
+            <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center" style="width:70px;height:70px;">
+              <i class="bi bi-clipboard2-check text-primary" style="font-size: 34px;"></i>
+            </div>
+          </div>
+          <a class="btn btn-gradient mt-3 w-100" href="{% url 'admin_list_hoy' %}">
+            <i class="bi bi-capsule-pill me-2"></i>Ir a administrar
+          </a>
+        </div>
+      </div>
+
+      <!-- Tarjeta: Alertas de stock crítico -->
+      <div class="col-lg-8">
+        <div class="glass-card p-4 h-100 d-flex flex-column">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-exclamation-triangle text-danger"></i>
+              <div class="h6 text-secondary mb-0">Alertas de stock crítico</div>
+            </div>
+            {% if criticos %}
+              <span class="badge bg-danger">{{ criticos|length }}</span>
+            {% endif %}
+          </div>
+
+          {% if criticos %}
+            <div class="list-group list-group-flush flex-grow-1" style="max-height: 420px; overflow-y:auto;">
+              {% for o in criticos %}
+                <div class="list-group-item d-flex flex-wrap justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-semibold">{{ o.receta.residente.nombre_completo }}</div>
+                    <div class="text-muted small">
+                      {{ o.producto.nombre }} {{ o.producto.potencia }} — {{ o.dosis }}
+                    </div>
+                    <div class="small mt-1">
+                      Stock:
+                      <span class="fw-bold text-danger">{{ o.stock_asignado }}</span>
+                      · Crítico: {{ o.stock_critico }}
+                    </div>
+                  </div>
+
+                  {# Acciones: SOLO Enfermera (Admin) puede reponer #}
+                  {% if request.user|is_admin %}
+                    <form method="post"
+                          action="{% url 'orden_restock' o.id %}"
+                          class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
+                      {% csrf_token %}
+                      <div class="input-group input-group-sm" style="width: 220px;">
+                        <input type="number" name="sumar" min="1" class="form-control" placeholder="+ unidades">
+                        <button class="btn btn-success">
+                          <i class="bi bi-plus-circle me-1"></i>Reponer
+                        </button>
+                      </div>
+                      <div class="d-flex flex-wrap gap-1">
+                        <button class="btn btn-outline-secondary btn-sm quick-add" data-add="5" type="button">+5</button>
+                        <button class="btn btn-outline-secondary btn-sm quick-add" data-add="10" type="button">+10</button>
+                        <button class="btn btn-outline-secondary btn-sm quick-add" data-add="30" type="button">+30</button>
+                      </div>
+                    </form>
+
+                  {% elif request.user|is_tens %}
+                    <div class="d-flex flex-column align-items-end text-end">
+                      <span class="badge bg-danger-subtle text-danger border border-danger small">
+                        <i class="bi bi-exclamation-octagon me-1"></i>Stock crítico
+                      </span>
+                      <small class="text-muted mt-1">
+                        Puedes coordinar con Enfermería para reponer stock.
+                      </small>
+                    </div>
+
+                  {% else %}
+                    <div class="d-flex flex-column align-items-end text-end">
+                      <span class="badge bg-danger-subtle text-danger border border-danger small">
+                        <i class="bi bi-exclamation-octagon me-1"></i>Stock crítico
+                      </span>
+                      <small class="text-muted mt-1">
+                        No tienes permisos para modificar stock.
+                      </small>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 py-4 text-center">
+              <i class="bi bi-shield-check text-success mb-2" style="font-size: 32px;"></i>
+              <div class="text-secondary">Todo en orden. No hay alertas de stock.</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
 </div>
 
 {% block extra_js %}
 <script>
-  // Botones rápidos +5/+10/+30 para Admin y TENS
+  // Botones rápidos +5/+10/+30 para Enfermera (admin)
   document.querySelectorAll('.quick-add').forEach(btn => {
     btn.addEventListener('click', () => {
       const form = btn.closest('form');
+      if (!form) return;
       const input = form.querySelector('input[name="sumar"]');
+      if (!input) return;
       const add = parseInt(btn.dataset.add || '0', 10);
       const val = parseInt(input.value || '0', 10);
       input.value = (isNaN(val) ? 0 : val) + add;

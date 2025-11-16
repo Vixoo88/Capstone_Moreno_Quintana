@@ -1,59 +1,178 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 1100px;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0"><i class="bi bi-capsule me-2"></i>Medicamentos</h3>
-    <div class="d-flex gap-2">
-      <a href="{% url 'medicamento_create' %}" class="btn btn-sm btn-primary">
-        <i class="bi bi-plus-lg me-1"></i> Nuevo
-      </a>
+
+  {# Encabezado #}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:40px;height:40px;">
+        <i class="bi bi-capsule text-primary"></i>
+      </div>
+      <div>
+        <h2 class="page-title mb-0">Medicamentos</h2>
+        <p class="small text-secondary mb-0">
+          Gestiona el catálogo de medicamentos disponibles en KIBEN.
+        </p>
+      </div>
     </div>
+
+    <a href="{% url 'medicamento_create' %}"
+       class="btn btn-gradient d-flex align-items-center gap-1 btn-sm">
+      <i class="bi bi-plus-lg"></i>
+      <span>Nuevo medicamento</span>
+    </a>
   </div>
 
-  <form method="get" class="d-flex gap-2 mb-3">
-    <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar por nombre, potencia o forma…">
-    <button class="btn btn-sm btn-outline-secondary">Buscar</button>
-  </form>
+  {# Filtro de búsqueda (responsive) #}
+  <div class="glass-card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-6 col-lg-5">
+        <label class="form-label small text-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="search"
+                 name="q"
+                 value="{{ q }}"
+                 class="form-control"
+                 placeholder="Nombre, concentracion o forma…">
+        </div>
+      </div>
 
+      <div class="col-6 col-md-2 col-lg-2">
+        <label class="form-label d-none d-md-block">&nbsp;</label>
+        <button class="btn btn-outline-secondary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Buscar
+        </button>
+      </div>
+
+      {% if q %}
+        <div class="col-6 col-md-auto">
+          <label class="form-label d-none d-md-block">&nbsp;</label>
+          <a class="btn btn-link btn-sm" href="{% url 'medicamentos_list' %}">
+            Limpiar filtros
+          </a>
+        </div>
+      {% endif %}
+    </form>
+
+    {% if page_obj.paginator.count %}
+      <div class="small text-secondary mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }}
+        de {{ page_obj.paginator.count }} medicamentos
+        <span class="text-muted">(50 por página)</span>
+      </div>
+    {% endif %}
+  </div>
+
+  {# Tabla de medicamentos #}
   <div class="glass-card p-2">
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th style="width:35%;">Nombre</th>
-            <th style="width:20%;">Potencia</th>
-            <th style="width:25%;">Forma</th>
-            <th class="text-end" style="width:20%;">Acciones</th>
+            <th style="width:40%;">Nombre genérico o principio activo</th>
+            <th class="d-none d-md-table-cell" style="width:20%;">Concentración</th>
+            <th class="d-none d-md-table-cell" style="width:25%;">Forma farmacéutica</th>
+            <th class="text-end" style="width:15%;">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for p in page_obj.object_list %}
             <tr>
-              <td class="fw-semibold">{{ p.nombre }}</td>
-              <td>{{ p.potencia }}</td>
-              <td>{{ p.forma }}</td>
+              <td class="fw-semibold">
+                {{ p.nombre }}
+                {# En móvil mostramos extra info debajo del nombre #}
+                <div class="d-md-none small text-secondary mt-1">
+                  {% if p.potencia %}{{ p.potencia }} · {% endif %}
+                  {% if p.forma %}{{ p.forma|title }}{% endif %}
+                </div>
+              </td>
+              <td class="d-none d-md-table-cell">{{ p.potencia|default:"—" }}</td>
+              <td class="d-none d-md-table-cell">
+                {% if p.forma %}
+                  {{ p.forma|title }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="text-end">
-                <a href="{% url 'medicamento_edit' p.id %}" class="btn btn-sm btn-outline-primary">Editar</a>
-                <a href="{% url 'medicamento_delete' p.id %}" class="btn btn-sm btn-outline-danger">Eliminar</a>
+                <div class="d-flex flex-wrap justify-content-end gap-1">
+                  <a href="{% url 'medicamento_edit' p.id %}"
+                     class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil-square me-1"></i>Editar
+                  </a>
+                  <a href="{% url 'medicamento_delete' p.id %}"
+                     class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash3 me-1"></i>Eliminar
+                  </a>
+                </div>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="text-center text-secondary">Sin medicamentos.</td></tr>
+            <tr>
+              <td colspan="4" class="text-center text-secondary py-3">
+                <i class="bi bi-info-circle me-1"></i>Sin medicamentos.
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    {# Paginación responsive #}
     {% if page_obj.paginator.num_pages > 1 %}
-      <div class="d-flex justify-content-between align-items-center mt-2 small">
-        <div>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</div>
-        <div class="btn-group">
-          {% if page_obj.has_previous %}
-            <a class="btn btn-sm btn-outline-secondary" href="?q={{ q }}&page={{ page_obj.previous_page_number }}">Anterior</a>
-          {% endif %}
-          {% if page_obj.has_next %}
-            <a class="btn btn-sm btn-outline-secondary" href="?q={{ q }}&page={{ page_obj.next_page_number }}">Siguiente</a>
-          {% endif %}
+      <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 small gap-2">
+        <div>
+          Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
         </div>
+        <nav aria-label="Paginación medicamentos">
+          <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="?q={{ q }}&page={{ page_obj.previous_page_number }}">
+                  Anterior
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Anterior</span>
+              </li>
+            {% endif %}
+
+            {# Números de página cercanos al actual #}
+            {% for num in page_obj.paginator.page_range %}
+              {% if num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                {% if num == page_obj.number %}
+                  <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                  </li>
+                {% else %}
+                  <li class="page-item">
+                    <a class="page-link" href="?q={{ q }}&page={{ num }}">{{ num }}</a>
+                  </li>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="?q={{ q }}&page={{ page_obj.next_page_number }}">
+                  Siguiente
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Siguiente</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
       </div>
     {% endif %}
   </div>

@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="container py-3" style="max-width: min(1200px, 100vw - 24px);">
+  <!-- Cabecera -->
+  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
+    <div class="d-flex align-items-center gap-2">
+      <h3 class="page-title mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-calendar3"></i>
+        <span>Registro mensual — TODOS los medicamentos</span>
+        <span class="text-secondary fw-normal fs-6">({{ year }}-{{ month|stringformat:"02d" }})</span>
+      </h3>
+      <small class="text-muted d-none d-md-inline">Generado: {% now "Y-m-d H:i" %}</small>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <!-- Navegación de mes -->
+      <div class="btn-group" role="group" aria-label="Navegación mensual">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPrev">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNext">
+          Siguiente <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+
+      <!-- Selector período -->
+      <form id="periodForm" method="get" class="d-flex align-items-center gap-2">
+        <input id="inpYear" type="number" min="2000" max="2100" name="year" class="form-control form-control-sm" value="{{ year }}" aria-label="Año">
+        <input id="inpMonth" type="number" min="1" max="12" name="month" class="form-control form-control-sm" value="{{ month }}" aria-label="Mes">
+        <button class="btn btn-sm btn-gradient"><i class="bi bi-search me-1"></i>Ir</button>
+      </form>
+
+      <!-- Imprimir / Guardar PDF (nativo navegador) -->
+      <button class="btn btn-sm btn-outline-secondary d-none d-md-inline" id="btnPrint">
+        <i class="bi bi-printer me-1"></i> Imprimir / Guardar PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Tira compacta del paciente (en pantalla) -->
+  <div class="patient-strip mb-2">
+    <span class="chip chip-name" title="Nombre">
+      <i class="bi bi-person"></i> {{ paciente.nombre }}
+    </span>
+    <span class="chip chip-rut" title="RUT">
+      <i class="bi bi-credit-card-2-front"></i> {{ paciente.rut }}
+    </span>
+    {% if paciente.edad %}
+      <span class="chip" title="Edad">
+        <i class="bi bi-cake"></i> {{ paciente.edad }} años
+      </span>
+    {% endif %}
+    {% if paciente.sexo %}
+      <span class="chip" title="Sexo">
+        <i class="bi bi-gender-ambiguous"></i> {{ paciente.sexo }}
+      </span>
+    {% endif %}
+    <span class="chip chip-alergias" title="{{ paciente.alergias|default:'Sin alergias registradas'|escape }}">
+      <i class="bi bi-exclamation-triangle"></i>
+      Alergias: {{ paciente.alergias|default:"Sin alergias registradas" }}
+    </span>
+    {% if not paciente.activo %}
+      <span class="chip chip-muted" title="Estado">
+        <i class="bi bi-slash-circle"></i> Inactivo
+      </span>
+    {% endif %}
+  </div>
+
+  {# En impresión mostramos SOLO esta línea de alergias (una sola vez, completa) #}
+  <div class="only-print small mb-2">
+    <strong>Alergias:</strong> {{ paciente.alergias|default:"Sin alergias registradas" }}
+  </div>
+
+  <!-- Resumen del mes -->
+  <div class="d-flex flex-wrap gap-2 mb-2 small" id="summaryRow" aria-live="polite">
+    <span class="badge badge-pill status-ok-badge">✓ <span id="sumOk">0</span></span>
+    <span class="badge badge-pill status-omit-badge">✕ <span id="sumOmit">0</span></span>
+    <span class="badge badge-pill status-rech-badge">R <span id="sumRech">0</span></span>
+    <span class="badge badge-pill status-pend-badge">• <span id="sumPend">0</span></span>
+  </div>
+
+  <!-- Tabla -->
+  <div class="glass-card p-2">
+    <div class="table-responsive position-relative" id="tableWrap">
+      <div class="scroll-hint d-print-none">Desliza &rarr;</div>
+      <table class="table table-sm table-bordered table-grid table-sticky align-middle mb-0" id="gridTable">
+        <colgroup>
+          <col class="col-label">
+          {% for d in days %}<col class="col-day">{% endfor %}
+        </colgroup>
+        <thead class="table-light" id="theadSticky">
+          <tr>
+            <th class="sticky-col-start label">Medicamento · Dosis — Hora</th>
+            {% for d in days %}
+              <th class="text-center day">{{ d }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td class="fw-semibold sticky-col-start bg-white label">{{ row.label }}</td>
+              {% for val in row.cells %}
+                {% with v=val|default:"" %}
+                  {% with c=v|slice:":1" %}
+                    <td
+                      class="text-center small cell
+                        {% if not v %} empty
+                        {% elif c == '✓' %} status-ok
+                        {% elif c == '✕' %} status-omit
+                        {% elif c == 'R' %} status-rech
+                        {% elif c == '•' %} status-pend
+                        {% else %} empty
+                        {% endif %}">
+                      <span class="cell-text">{{ v }}</span>
+                    </td>
+                  {% endwith %}
+                {% endwith %}
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{{ days|length|add:1 }}" class="text-center text-secondary">Sin datos para este mes.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-2 text-secondary small">
+      <span class="me-3">Leyenda: <strong>✓</strong> dada · <strong>✕</strong> omitida · <strong>R</strong> rechazada · <strong>•</strong> pendiente</span>
+      <span class="text-muted">Entre paréntesis aparece quien la registró.</span>
+    </div>
+  </div>
+</div>
+
+{# === Estilos (igual que tu template original) === #}
+<style>
+  :root{
+    /* base desktop */
+    --day-col: 40px;
+    --day-min: 32px;
+    --dyn-day-min: 0px; /* JS ajusta en móvil */
+
+    --ok:#2e7d32; --ok-bg:#e6f4ea;
+    --omit:#c62828; --omit-bg:#fdecea;
+    --rech:#ef6c00; --rech-bg:#fff3e0;
+    --pend:#5f6368; --pend-bg:#f1f3f4;
+
+    --sticky-shadow: 8px 0 10px -6px rgba(0,0,0,.12);
+    --thead-shadow: 0 6px 10px -6px rgba(0,0,0,.12);
+  }
+
+  .btn-gradient{ background: linear-gradient(135deg,#6c63ff,#7ec8e3); color:#fff; border:0;}
+  .btn-gradient:hover{ filter: brightness(0.95); }
+
+  .glass-card{ background: rgba(255,255,255,0.65); backdrop-filter: blur(6px); border-radius: 12px; border: 1px solid rgba(0,0,0,0.06); }
+
+  .patient-strip{
+    display:flex; flex-wrap:wrap; align-items:center;
+    gap:.35rem .5rem; padding:.45rem .65rem;
+    border:1px solid rgba(0,0,0,0.04);
+    border-radius:10px; background:#fff;
+    font-size:.85rem; line-height:1.1;
+  }
+  .patient-strip .chip{
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.12rem .5rem; border-radius:999px;
+    background:#f6f7f9; color:#454a50; border:1px solid #e6e8eb;
+    font-weight:600; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .patient-strip .chip i{ font-size:.95em; opacity:.8; }
+  .patient-strip .chip-muted{ background:#f1f3f4; color:#6b7280; }
+  .patient-strip .chip-alergias{ background:#fff7f6; color:#8b1d18; border-color:#f6c7c3; }
+
+  .table-sticky thead th{ position: sticky; top: 0; z-index: 5; }
+  .sticky-col-start{ position: sticky; left: 0; z-index: 6; background: #fff; box-shadow: var(--sticky-shadow); }
+  .table-grid{ border-collapse: separate; border-spacing: 0; }
+  .table-grid th, .table-grid td{ border: 1px solid #e0e3e8; background-clip: padding-box; }
+  .table-grid thead th{ border-bottom-width: 2px; background:#f6f7f9; }
+
+  .col-label{ width: 360px; }
+  .col-day{ width: var(--day-col); min-width: var(--day-col); }
+
+  .label{ max-width: 480px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell{ padding: .2rem .25rem; vertical-align: middle; }
+  .cell-text{ white-space: nowrap; line-height: 1.05; font-size: 13px; }
+
+  .status-ok{ background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+  .status-omit{ background: var(--omit-bg); color: var(--omit); font-weight: 600; }
+  .status-rech{ background: var(--rech-bg); color: var(--rech); font-weight: 600; }
+  .status-pend{ background: var(--pend-bg); color: var(--pend); font-weight: 600; }
+  .empty{ color: #a0a4a8; }
+
+  .badge-pill{ border-radius: 999px; padding: .35rem .6rem; font-weight: 600; }
+  .status-ok-badge{ background: var(--ok-bg); color: var(--ok); }
+  .status-omit-badge{ background: var(--omit-bg); color: var(--omit); }
+  .status-rech-badge{ background: var(--rech-bg); color: var(--rech); }
+  .status-pend-badge{ background: var(--pend-bg); color: var(--pend); }
+
+  .scroll-hint{
+    position: absolute; top: .5rem; right: .5rem;
+    background: rgba(255,255,255,.85);
+    border: 1px solid rgba(0,0,0,.08);
+    padding: .2rem .5rem; border-radius: 999px; font-size: .75rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    pointer-events: none;
+  }
+  .thead-scrolled{ box-shadow: var(--thead-shadow); }
+
+  @media (max-width: 768px){
+    :root{ --day-col: 36px; --day-min: 32px; }
+    #gridTable{ table-layout: auto; }
+    .col-day{ width: auto !important; min-width: max(var(--day-min), var(--dyn-day-min)); }
+    .col-label{ width: min(260px, 55vw); }
+    .label{ max-width: min(260px, 55vw); }
+    .cell-text{ font-size: 12px; }
+    .patient-strip{ font-size:.8rem; padding:.35rem .55rem; }
+    .patient-strip .chip{ padding:.1rem .45rem; }
+  }
+
+  .only-print{ display:none; }
+  @media print{
+    @page{ size: A4 landscape; margin: 8mm; }
+    html, body{
+      background: #fff !important;
+      print-color-adjust: exact; -webkit-print-color-adjust: exact;
+    }
+    .navbar, header, nav, [role="navigation"]{ display: none !important; }
+    .container, .glass-card, table, thead, tbody, th, td{
+      background: #fff !important;
+      box-shadow: none !important;
+    }
+    .btn, form, .page-title i, .d-none, .d-print-none, .scroll-hint{ display: none !important; }
+
+    #tableWrap{ overflow: visible !important; }
+    .table-sticky thead th, .sticky-col-start{ position: static !important; box-shadow: none !important; }
+
+    #gridTable{ width: 100% !important; table-layout: fixed !important; }
+    thead{ display: table-header-group; }
+    tr{ break-inside: avoid; page-break-inside: avoid; }
+
+    .col-label{ width: 180px !important; }
+    .col-day{ width: auto !important; min-width: 0 !important; }
+    .table{ font-size: 10px; }
+    .cell-text{ white-space: nowrap; font-size: 10px; }
+    .label{ white-space: normal !important; }
+
+    .only-print{ display:block !important; }
+    .patient-strip .chip-alergias{ display:none !important; }
+  }
+</style>
+
+<script>
+  (function(){
+    const f = document.getElementById('periodForm');
+    const y = document.getElementById('inpYear');
+    const m = document.getElementById('inpMonth');
+    const shift = (delta) => {
+      let yy = parseInt(y.value || '0', 10);
+      let mm = parseInt(m.value || '0', 10);
+      if(!yy || !mm){ return; }
+      mm += delta;
+      if(mm < 1){ mm = 12; yy -= 1; }
+      if(mm > 12){ mm = 1; yy += 1; }
+      y.value = yy; m.value = mm; f.submit();
+    };
+    document.getElementById('btnPrev').addEventListener('click', ()=>shift(-1));
+    document.getElementById('btnNext').addEventListener('click', ()=>shift(1));
+
+    const cells = document.querySelectorAll('tbody td .cell-text');
+    let ok=0, om=0, re=0, pe=0;
+
+    cells.forEach(el=>{
+      const raw = (el.textContent||'').trim();
+      if(!raw){ return; }
+      const parts = raw.split('/').map(s=>s.trim()).filter(Boolean);
+      const html = parts.map(p=>{
+        const m = p.match(/^([✓✕R•])(?:\s*\(([^)]+)\))?$/);
+        if(m){
+          const sym = m[1];
+          const who = m[2] ? ` <span class="who">(${m[2]})</span>` : '';
+          if(sym==='✓') ok++; else if(sym==='✕') om++; else if(sym==='R') re++; else if(sym==='•') pe++;
+          return `<span class="mark"><span class="sym">${sym}</span>${who}</span>`;
+        }
+        return p;
+      }).join('<span class="sep"> / </span>');
+      el.innerHTML = html || raw;
+    });
+
+    document.getElementById('sumOk').textContent = ok;
+    document.getElementById('sumOmit').textContent = om;
+    document.getElementById('sumRech').textContent = re;
+    document.getElementById('sumPend').textContent = pe;
+
+    function setDynamicMinWidth(){
+      if (window.matchMedia('(max-width: 768px)').matches === false){
+        document.documentElement.style.setProperty('--dyn-day-min', '0px');
+        return;
+      }
+      const measurer = document.createElement('span');
+      measurer.style.visibility='hidden';
+      measurer.style.position='absolute';
+      measurer.style.whiteSpace='nowrap';
+      measurer.className='cell-text';
+      document.body.appendChild(measurer);
+
+      let maxW = 0;
+      document.querySelectorAll('tbody td .cell-text').forEach(node=>{
+        const s = (node.textContent||'').trim();
+        if(!s) return;
+        measurer.textContent = s;
+        const w = measurer.getBoundingClientRect().width + 8;
+        if (w > maxW) maxW = w;
+      });
+      document.body.removeChild(measurer);
+      const px = Math.max(36, Math.min(140, Math.ceil(maxW)));
+      document.documentElement.style.setProperty('--dyn-day-min', px+'px');
+    }
+    setDynamicMinWidth();
+    window.addEventListener('resize', debounce(setDynamicMinWidth, 150));
+    function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+    document.getElementById('btnPrint')?.addEventListener('click', ()=>{
+      requestAnimationFrame(()=> setTimeout(()=> window.print(), 30));
+    });
+
+    const wrap = document.getElementById('tableWrap');
+    const hint = document.querySelector('.scroll-hint');
+    const thead = document.getElementById('theadSticky');
+    if(wrap){
+      wrap.addEventListener('scroll', ()=>{
+        if(hint) hint.style.display='none';
+        thead.classList.toggle('thead-scrolled', wrap.scrollTop > 0);
+      });
+    }
+  })();
+</script>
+{% endblock %}

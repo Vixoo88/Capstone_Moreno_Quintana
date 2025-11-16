@@ -16,7 +16,7 @@
           <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span class="d-flex align-items-center gap-1">
               <i class="bi bi-people"></i>
-              <span>Seleccionar cuidadoras</span>
+              <span>Seleccionar cuidadoras / TENS</span>
             </span>
             <div class="btn-group btn-group-sm flex-wrap" role="group">
               <button class="btn btn-outline-secondary" type="button" id="btnSelTodas">Todas</button>
@@ -31,17 +31,37 @@
               {% if cuidadoras %}
                 {% for c in cuidadoras %}
                   <div class="form-check mb-2">
-                    <input class="form-check-input cuidadora-check" type="checkbox"
-                           name="cuidadores" id="c_{{ c.id }}" value="{{ c.id }}"
-                           {% if c.id in seleccion_ids %}checked{% endif %}>
+                    <input
+                      class="form-check-input cuidadora-check"
+                      type="checkbox"
+                      name="cuidadores"
+                      id="c_{{ c.id }}"
+                      value="{{ c.id }}"
+                      {% if c.id in seleccion_ids %}checked{% endif %}
+                    >
                     <label class="form-check-label d-flex justify-content-between w-100 gap-2" for="c_{{ c.id }}">
-                      <span class="text-truncate">{{ c.get_full_name|default:c.username }}</span>
-                      <span class="text-muted small d-none d-sm-inline">({{ c.username }})</span>
+                      <span class="text-truncate d-flex align-items-center gap-2">
+                        {{ c.get_full_name|default:c.username }}
+                        {% if c|is_tens %}
+                          <span class="badge rounded-pill small"
+                                style="background-color:#00B6FF; color:#ffffff;">
+                            TENS
+                          </span>
+
+
+                        {% else %}
+                          <span class="badge rounded-pill small"
+                                style="background-color:#ff69b4; color:#ffffff;">
+                            Cuidador/a
+                          </span>
+
+                        {% endif %}
+                      </span>
                     </label>
                   </div>
                 {% endfor %}
               {% else %}
-                <div class="text-muted">No hay cuidadoras activas.</div>
+                <div class="text-muted">No hay cuidadoras o TENS activas.</div>
               {% endif %}
 
               <hr class="my-3">
@@ -50,7 +70,7 @@
                 <i class="bi bi-shuffle me-1"></i>Generar asignación equitativa
               </button>
               <div class="form-text small mb-3">
-                Si no seleccionas ninguna, se usarán <b>todas</b> las cuidadoras activas por defecto.
+                Si no seleccionas ninguna, se usarán <b>todas</b> las cuidadoras/TENS activas por defecto.
               </div>
             </form>
 
@@ -79,22 +99,22 @@
           </div>
         </div>
 
-        <!-- NUEVO: Avisos por Telegram -->
+        <!-- Avisos por Telegram -->
         <div class="card border-0 shadow-sm mt-3">
           <div class="card-header bg-transparent fw-semibold d-flex align-items-center gap-2">
             <i class="bi bi-send-check"></i><span>Enviar aviso por Telegram</span>
           </div>
           <div class="card-body">
-            <form method="post" action="{% url 'asignaciones_avisar_meds' %}">
+            <form method="post" action="{% url 'asignaciones_avisar_meds' %}" id="formAviso">
               {% csrf_token %}
               <textarea name="mensaje" class="form-control form-control-sm" rows="2"
-                placeholder="Escribe el aviso…">💊 Medicamentos de hoy están listos para retiro en Enfermería. Por favor pasar a buscar y administrar. Gracias.</textarea>
+                placeholder="Escribe el aviso…">💊 Medicamentos de hoy están listos para retiro en Farmacia. Por favor pasar a buscar y administrar. Gracias.</textarea>
               <div class="d-flex gap-2 mt-2">
                 <button class="btn btn-outline-success w-100">
                   <i class="bi bi-send me-1"></i>Enviar aviso
                 </button>
                 <button type="button" class="btn btn-outline-secondary w-100"
-                  onclick="this.closest('form').querySelector('textarea').value='💊 Medicamentos listos. Pasar a buscar por Enfermería. Gracias.'">
+                  onclick="this.closest('form').querySelector('textarea').value='💊 Medicamentos listos. Pasar a buscar por Farmacia. Gracias.'">
                   Mensaje corto
                 </button>
               </div>
@@ -110,7 +130,7 @@
           <div class="card-header bg-transparent fw-semibold d-flex align-items-center gap-2">
             <i class="bi bi-list-check"></i>
             <span>Asignaciones de hoy</span>
-            <span class="badge bg-secondary ms-auto">{{ grupos|length }} cuidadora(s)</span>
+            <span class="badge bg-secondary ms-auto">{{ grupos|length }} cuidador(es)</span>
           </div>
 
           <div class="card-body">
@@ -150,6 +170,33 @@
   </div>
 </div>
 
+{# MODAL DE CARGA #}
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">
+          <i class="bi bi-arrow-repeat me-2 spinner-icon"></i>
+          Procesando…
+        </h5>
+      </div>
+      <div class="modal-body">
+        <div class="progress mb-2">
+          <div class="progress-bar" id="loadingProgress" role="progressbar"
+               style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            0%
+          </div>
+        </div>
+        <p class="small text-muted mb-0">
+          Por favor espera mientras se completa la operación.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block extra_css %}
 <style>
   @media (max-width: 576.98px) {
@@ -167,18 +214,111 @@
     border-top: 1px solid rgba(0,0,0,.06); z-index: 1;
   }
   .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Spinner del icono del modal */
+  .spinner-icon {
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  (function(){
+  (function() {
+    // Seleccionar todas / ninguna
     const todasBtn = document.getElementById('btnSelTodas');
     const ningunaBtn = document.getElementById('btnSelNinguna');
     const checks = () => Array.from(document.querySelectorAll('.cuidadora-check'));
-    if (todasBtn) todasBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = true));
-    if (ningunaBtn) ningunaBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = false));
+    if (todasBtn) {
+      todasBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = true));
+    }
+    if (ningunaBtn) {
+      ningunaBtn.addEventListener('click', () => checks().forEach(ch => ch.checked = false));
+    }
+
+    const loadingModalEl = document.getElementById('loadingModal');
+    const loadingBar = document.getElementById('loadingProgress');
+    let loadingModalInstance = null;
+    let loadingInterval = null;
+
+    if (loadingModalEl && window.bootstrap) {
+      loadingModalInstance = new bootstrap.Modal(loadingModalEl);
+    }
+
+    function startInterval(fromValue, toValue, step, delay, onEnd) {
+      if (!loadingBar) return;
+      let val = fromValue;
+      loadingBar.style.width = val + '%';
+      loadingBar.textContent = val + '%';
+      loadingBar.setAttribute('aria-valuenow', String(val));
+
+      if (loadingInterval) {
+        clearInterval(loadingInterval);
+      }
+      loadingInterval = setInterval(() => {
+        val += step;
+        if (val >= toValue) {
+          val = toValue;
+          clearInterval(loadingInterval);
+          loadingInterval = null;
+          if (onEnd) onEnd();
+        }
+        loadingBar.style.width = val + '%';
+        loadingBar.textContent = val + '%';
+        loadingBar.setAttribute('aria-valuenow', String(val));
+      }, delay);
+    }
+
+    // Cuando envío el formulario → 0% → 90% y marco operación pendiente
+    function showLoading(operationName) {
+      if (!loadingModalInstance || !loadingBar) return;
+      try {
+        sessionStorage.setItem('pendingLoadingOp', operationName);
+      } catch (e) {
+        // si falla sessionStorage, solo se ve la animación de esta página
+      }
+
+      loadingModalInstance.show();
+      startInterval(0, 90, 5, 150, null);  // 0 → 90 y se queda ahí
+    }
+
+    // Al recargar después del POST → 90% → 100% y cerrar
+    function finishLoadingIfNeeded() {
+      if (!loadingModalInstance || !loadingBar) return;
+      let hasPending = false;
+      try {
+        hasPending = !!sessionStorage.getItem('pendingLoadingOp');
+      } catch (e) {
+        hasPending = false;
+      }
+      if (!hasPending) return;
+
+      loadingModalInstance.show();
+      startInterval(90, 100, 2, 100, () => {
+        loadingModalInstance.hide();
+        try { sessionStorage.removeItem('pendingLoadingOp'); } catch (e) {}
+      });
+    }
+
+    const formGenerar = document.getElementById('formGenerar');
+    const formAviso = document.getElementById('formAviso');
+
+    if (formGenerar) {
+      formGenerar.addEventListener('submit', () => {
+        showLoading('asignaciones_generar');
+      });
+    }
+    if (formAviso) {
+      formAviso.addEventListener('submit', () => {
+        showLoading('asignaciones_avisar_meds');
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', finishLoadingIfNeeded);
   })();
 </script>
-{% endblock %}
 {% endblock %}

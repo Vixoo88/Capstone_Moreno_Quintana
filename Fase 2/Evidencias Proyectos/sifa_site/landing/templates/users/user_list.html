@@ -1,55 +1,179 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container py-4" style="max-width: 1100px;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Usuarios</h3>
-    <a class="btn btn-sm btn-primary" href="{% url 'user_create' %}"><i class="bi bi-plus-lg me-1"></i> Nuevo</a>
+
+  {# Encabezado #}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:40px;height:40px;">
+        <i class="bi bi-people-fill text-primary"></i>
+      </div>
+      <div>
+        <h2 class="page-title mb-0">Funcionarios</h2>
+        <p class="small text-secondary mb-0">
+          Administra las cuentas y accesos del equipo en KIBEN.
+        </p>
+      </div>
+    </div>
+
+    <a class="btn btn-gradient d-flex align-items-center gap-1"
+       href="{% url 'user_create' %}">
+      <i class="bi bi-plus-lg"></i>
+      <span>Nuevo usuario</span>
+    </a>
   </div>
 
-  <form method="get" class="mb-2 d-flex gap-2">
-    <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar usuario...">
-    <button class="btn btn-sm btn-outline-secondary">Buscar</button>
-  </form>
+  {# Buscador + filtro de rol en tarjeta #}
+  <div class="glass-card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      {# Búsqueda libre #}
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="form-label small text-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="search"
+                 name="q"
+                 value="{{ q }}"
+                 class="form-control"
+                 placeholder="Nombre, usuario o correo…">
+        </div>
+      </div>
 
+      {# Filtro de rol #}
+      <div class="col-6 col-md-3 col-lg-3">
+        <label class="form-label small text-secondary">Rol</label>
+        <select name="rol"
+                class="form-select form-select-sm"
+                onchange="this.form.submit()">
+          <option value="" {% if not rol %}selected{% endif %}>Todos</option>
+
+          {# Enfermera/o = grupo ADMIN #}
+          <option value="ADMIN" {% if rol == 'ADMIN' %}selected{% endif %}>Enfermera/o</option>
+
+          {# TENS #}
+          <option value="TENS" {% if rol == 'TENS' %}selected{% endif %}>TENS</option>
+
+          {# Doctor/a #}
+          <option value="DOCTOR" {% if rol == 'DOCTOR' %}selected{% endif %}>Doctor/a</option>
+
+          {# Cuidador/a #}
+          <option value="CUIDADORA" {% if rol == 'CUIDADORA' %}selected{% endif %}>Cuidador/a</option>
+        </select>
+      </div>
+
+      {# Botón buscar #}
+      <div class="col-6 col-md-3 col-lg-2">
+        <label class="form-label d-none d-md-block">&nbsp;</label>
+        <button class="btn btn-outline-secondary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Buscar
+        </button>
+      </div>
+
+      {# Limpiar filtros #}
+      {% if q or rol %}
+        <div class="col-6 col-md-auto">
+          <label class="form-label d-none d-md-block">&nbsp;</label>
+          <a class="btn btn-link btn-sm" href="{% url 'user_list' %}">
+            Limpiar filtros
+          </a>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+
+  {# Tabla de usuarios #}
   <div class="glass-card p-2">
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Usuario</th>
-            <th>Nombre</th>
-            <th>Correo</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th style="width:220px;"></th>
+            <th scope="col">Usuario</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Correo</th>
+            <th scope="col">Rol</th>
+            <th scope="col">Estado</th>
+            <th scope="col" class="text-end" style="width:230px;">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for u, rol in items %}
-            <tr>
-              <td class="fw-semibold">{{ u.username }}</td>
-              <td>{{ u.get_full_name|default:u.username }}</td>
-              <td>{{ u.email }}</td>
-              <td><span class="badge bg-light text-dark">{{ rol }}</span></td>
+            <tr class="{% if not u.is_active %}text-muted{% endif %}">
+              <td class="fw-semibold">
+                <i class="bi bi-person-badge me-1 text-secondary"></i>{{ u.username }}
+              </td>
+              <td>
+                {{ u.get_full_name|default:u.username }}
+              </td>
+              <td class="small">
+                {{ u.email|default:"—" }}
+              </td>
+              <td>
+                {# Badge de rol con color según tipo #}
+                {% if rol == 'ADMIN' or rol == 'Admin' %}
+                  <span class="badge rounded-pill small"
+                        style="background-color:#000080; color:#ffffff;">
+                    Enfermera/o
+                  </span>
+                {% elif rol == 'TENS' %}
+                  <span class="badge rounded-pill small"
+                        style="background-color:#00B6FF; color:#ffffff;">
+                    TENS
+                  </span>
+                {% elif rol == 'DOCTOR' or rol == 'Doctor' %}
+                  <span class="badge rounded-pill small"
+                        style="background-color:#000000; color:#ffffff;">
+                    Doctor/a
+                  </span>
+                {% elif rol == 'CUIDADORA' or rol == 'Cuidadora' %}
+                  <span class="badge rounded-pill small"
+                        style="background-color:#ff69b4; color:#ffffff;">
+                    Cuidador/a
+                  </span>
+                {% else %}
+                  <span class="badge rounded-pill bg-light text-dark border small">
+                    {{ rol }}
+                  </span>
+                {% endif %}
+              </td>
               <td>
                 {% if u.is_active %}
-                  <span class="badge bg-success-subtle text-success">Activo</span>
+                  <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                    <i class="bi bi-check-circle me-1"></i>Activo
+                  </span>
                 {% else %}
-                  <span class="badge bg-secondary">Inactivo</span>
+                  <span class="badge bg-secondary small">
+                    <i class="bi bi-slash-circle me-1"></i>Inactivo
+                  </span>
                 {% endif %}
               </td>
               <td class="text-end">
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'user_edit' u.id %}">Editar</a>
-                <a class="btn btn-sm btn-outline-warning" href="{% url 'user_password' u.id %}">Contraseña</a>
-                <a class="btn btn-sm btn-outline-danger" href="{% url 'user_delete' u.id %}">Eliminar</a>
+                <div class="d-flex flex-wrap justify-content-end gap-1">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{% url 'user_edit' u.id %}">
+                    <i class="bi bi-pencil-square me-1"></i>Editar
+                  </a>
+                  <a class="btn btn-sm btn-outline-warning"
+                     href="{% url 'user_password' u.id %}">
+                    <i class="bi bi-key me-1"></i>Contraseña
+                  </a>
+                </div>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="text-center text-secondary">Sin usuarios.</td></tr>
+            <tr>
+              <td colspan="6" class="text-center text-secondary py-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Sin usuarios.
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
+
 </div>
 {% endblock %}

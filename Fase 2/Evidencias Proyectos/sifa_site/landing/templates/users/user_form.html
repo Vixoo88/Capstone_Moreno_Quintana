@@ -1,132 +1,194 @@
 {% extends 'base.html' %}
+
 {% block content %}
-<div class="container py-4" style="max-width: 760px;">
+<div class="container py-4" style="max-width: 780px;">
+
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">{{ title }}</h3>
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:40px;height:40px;">
+        <i class="bi bi-person-gear text-primary"></i>
+      </div>
+      <div>
+        <h3 class="mb-0">{{ title }}</h3>
+        <p class="small text-secondary mb-0">
+          Define el rol, usuario y datos del funcionario en KIBEN.
+        </p>
+      </div>
+    </div>
   </div>
 
   <div class="glass-card p-3 p-md-4">
+
+    {# Errores generales del form #}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for e in form.non_field_errors %}
+          {{ e }}<br>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     <form method="post" novalidate>
       {% csrf_token %}
 
-      {# Errores generales del form (no-field errors) #}
-      {% if form.non_field_errors %}
-        <div class="alert alert-danger">
-          {% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}
-        </div>
-      {% endif %}
-
-      <!-- === Datos de cuenta === -->
+      <!-- === Datos de la cuenta === -->
       <fieldset class="mb-3">
         <legend class="fs-6 text-uppercase text-secondary mb-2">
-          <i class="bi bi-person-gear me-1"></i> Datos de cuenta
+          <i class="bi bi-person-badge me-1"></i> Datos de la cuenta
         </legend>
 
         <div class="row g-3 row-cols-1 row-cols-md-2">
-          {% if form.username %}
-            <div class="col">
-              <label class="form-label mb-1">{{ form.username.label }}</label>
-              {{ form.username }}
-              {% if form.username.help_text %}<div class="form-text">{{ form.username.help_text }}</div>{% endif %}
-              {% if form.username.errors %}
-                <div class="invalid-feedback d-block">
-                  {% for e in form.username.errors %}{{ e }}{% endfor %}
-                </div>
-              {% endif %}
-            </div>
-          {% endif %}
 
+          <!-- Rol -->
           <div class="col">
-            <label class="form-label mb-1">{{ form.role.label }}</label>
+            <label class="form-label mb-1">Rol</label>
             {{ form.role }}
-            {% if form.role.help_text %}<div class="form-text">{{ form.role.help_text }}</div>{% endif %}
+            <div class="form-text">
+              Enfermera/o corresponde al rol administrativo principal del sistema.
+            </div>
             {% if form.role.errors %}
               <div class="invalid-feedback d-block">
-                {% for e in form.role.errors %}{{ e }}{% endfor %}
+                {% for e in form.role.errors %}
+                  {{ e }}
+                {% endfor %}
               </div>
             {% endif %}
           </div>
 
-          <div class="col">
-            <label class="form-label mb-1">{{ form.first_name.label }}</label>
-            {{ form.first_name }}
-            {% if form.first_name.help_text %}<div class="form-text">{{ form.first_name.help_text }}</div>{% endif %}
-            {% if form.first_name.errors %}
-              <div class="invalid-feedback d-block">
-                {% for e in form.first_name.errors %}{{ e }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="col">
-            <label class="form-label mb-1">{{ form.last_name.label }}</label>
-            {{ form.last_name }}
-            {% if form.last_name.help_text %}<div class="form-text">{{ form.last_name.help_text }}</div>{% endif %}
-            {% if form.last_name.errors %}
-              <div class="invalid-feedback d-block">
-                {% for e in form.last_name.errors %}{{ e }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="col">
-            <label class="form-label mb-1">{{ form.email.label }}</label>
-            {{ form.email }}
-            {% if form.email.help_text %}<div class="form-text">{{ form.email.help_text }}</div>{% endif %}
-            {% if form.email.errors %}
-              <div class="invalid-feedback d-block">
-                {% for e in form.email.errors %}{{ e }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-
+          <!-- Activo / inactivo -->
           <div class="col d-flex align-items-center">
             <div class="form-check form-switch mt-3 mt-md-0">
               {{ form.is_active }}
-              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
+                {{ form.is_active.label }}
+              </label>
             </div>
             {% if form.is_active.errors %}
               <div class="invalid-feedback d-block ms-3">
-                {% for e in form.is_active.errors %}{{ e }}{% endfor %}
+                {% for e in form.is_active.errors %}
+                  {{ e }}
+                {% endfor %}
               </div>
             {% endif %}
           </div>
+
+          <!-- Nombre de usuario + toggle auto -->
+          {% if form.username %}
+            <div class="col-12 col-md-8">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-1 mb-md-0" for="{{ form.username.id_for_label }}">
+                  Nombre de usuario
+                </label>
+                <div class="form-check form-check-inline small m-0">
+                  <input class="form-check-input" type="checkbox" id="autoUsernameToggle" checked>
+                  <label class="form-check-label" for="autoUsernameToggle">
+                    Generar automáticamente
+                  </label>
+                </div>
+              </div>
+
+              {{ form.username }}
+              {% for e in form.username.errors %}
+                <div class="invalid-feedback d-block">{{ e }}</div>
+              {% endfor %}
+              <div class="form-text">
+                Formato automático:
+                <code>3 letras del nombre + "." + primer apellido</code>.
+                Ej: <code>vic.moreno</code>
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- Correo -->
+          <div class="col">
+            <label class="form-label mb-1" for="{{ form.email.id_for_label }}">
+              {{ form.email.label }}
+            </label>
+            {{ form.email }}
+            {% if form.email.help_text %}
+              <div class="form-text">{{ form.email.help_text }}</div>
+            {% endif %}
+            {% for e in form.email.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <!-- Nombre -->
+          <div class="col">
+            <label class="form-label mb-1" for="{{ form.first_name.id_for_label }}">
+              {{ form.first_name.label }}
+            </label>
+            {{ form.first_name }}
+            {% if form.first_name.help_text %}
+              <div class="form-text">{{ form.first_name.help_text }}</div>
+            {% endif %}
+            {% for e in form.first_name.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <!-- Apellidos -->
+          <div class="col">
+            <label class="form-label mb-1" for="{{ form.last_name.id_for_label }}">
+              {{ form.last_name.label }}
+            </label>
+            {{ form.last_name }}
+            {% if form.last_name.help_text %}
+              <div class="form-text">{{ form.last_name.help_text }}</div>
+            {% endif %}
+            {% for e in form.last_name.errors %}
+              <div class="invalid-feedback d-block">{{ e }}</div>
+            {% endfor %}
+          </div>
+
         </div>
       </fieldset>
 
+      <!-- === Contraseña (solo crear) === -->
       {% if form.password1 %}
-      <!-- === Contraseña (solo si el form la trae) === -->
-      <fieldset class="mb-2">
-        <legend class="fs-6 text-uppercase text-secondary mb-2">
-          <i class="bi bi-key me-1"></i> Contraseña
-        </legend>
+        <fieldset class="mb-2">
+          <legend class="fs-6 text-uppercase text-secondary mb-2">
+            <i class="bi bi-key me-1"></i> Contraseña
+          </legend>
 
-        <div class="row g-3 row-cols-1 row-cols-md-2">
-          <div class="col">
-            <label class="form-label mb-1">{{ form.password1.label }}</label>
-            {{ form.password1 }}
-            {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text }}</div>{% endif %}
-            {% if form.password1.errors %}
-              <div class="invalid-feedback d-block">
-                {% for e in form.password1.errors %}{{ e }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
+          <div class="row g-3 row-cols-1 row-cols-md-2">
 
-          <div class="col">
-            <label class="form-label mb-1">{{ form.password2.label }}</label>
-            {{ form.password2 }}
-            {% if form.password2.help_text %}<div class="form-text">{{ form.password2.help_text }}</div>{% endif %}
-            {% if form.password2.errors %}
-              <div class="invalid-feedback d-block">
-                {% for e in form.password2.errors %}{{ e }}{% endfor %}
+            <div class="col">
+              <label class="form-label mb-1" for="{{ form.password1.id_for_label }}">
+                {{ form.password1.label }}
+              </label>
+              {{ form.password1 }}
+              {% if form.password1.help_text %}
+                <div class="form-text">{{ form.password1.help_text }}</div>
+              {% endif %}
+              <div class="form-text">
+                <strong>Recomendación:</strong> usar una <b>contraseña temporal</b>.
+                Luego el funcionario podrá cambiarla en <em>“Mi perfil”</em>.
               </div>
-            {% endif %}
+              {% for e in form.password1.errors %}
+                <div class="invalid-feedback d-block">{{ e }}</div>
+              {% endfor %}
+            </div>
+
+            <div class="col">
+              <label class="form-label mb-1" for="{{ form.password2.id_for_label }}">
+                {{ form.password2.label }}
+              </label>
+              {{ form.password2 }}
+              {% if form.password2.help_text %}
+                <div class="form-text">{{ form.password2.help_text }}</div>
+              {% endif %}
+              {% for e in form.password2.errors %}
+                <div class="invalid-feedback d-block">{{ e }}</div>
+              {% endfor %}
+            </div>
+
           </div>
-        </div>
-      </fieldset>
+        </fieldset>
       {% endif %}
 
+      <!-- Botones -->
       <div class="d-flex flex-wrap gap-2 mt-3">
         <button class="btn btn-primary">
           <i class="bi bi-check2 me-1"></i> Guardar
@@ -135,20 +197,129 @@
           <i class="bi bi-arrow-left me-1"></i> Volver
         </a>
       </div>
+
     </form>
   </div>
 </div>
 
 <style>
-  /* Ajustes de usabilidad y responsivo */
-  .glass-card{ border-radius: 12px; border: 1px solid rgba(0,0,0,0.06); }
-  .form-label{ font-weight: 600; }
-  /* Asegura ancho completo de los widgets por si no traen clases Bootstrap */
-  input[type="text"], input[type="email"], input[type="password"], input[type="number"],
-  select, textarea { width: 100%; }
-  /* Separación entre fieldsets en móviles */
+  .glass-card{
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: rgba(255,255,255,0.9);
+  }
+  .form-label{
+    font-weight: 600;
+  }
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  select,
+  textarea{
+    width: 100%;
+  }
   @media (max-width: 768px){
-    fieldset{ margin-bottom: .75rem; }
+    fieldset{
+      margin-bottom: .75rem;
+    }
   }
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // 1) Cambiar visualmente nombres de rol a versión unisex
+    const roleSelect = document.getElementById('{{ form.role.id_for_label }}');
+    if (roleSelect) {
+      Array.from(roleSelect.options).forEach(opt => {
+        const txt = opt.text.trim();
+        if (txt === 'Admin') {
+          opt.text = 'Enfermera/o';
+        } else if (txt === 'Doctor') {
+          opt.text = 'Doctor/a';
+        } else if (txt === 'Cuidadora') {
+          opt.text = 'Cuidador/a';
+        }
+        // TENS queda igual
+      });
+    }
+
+    // 2) Auto-generar username: 3 letras del nombre + "." + primer apellido
+    const usernameInput  = document.getElementById('{{ form.username.id_for_label }}');
+    const firstNameInput = document.getElementById('{{ form.first_name.id_for_label }}');
+    const lastNameInput  = document.getElementById('{{ form.last_name.id_for_label }}');
+    const autoToggle     = document.getElementById('autoUsernameToggle');
+
+    // Si en este form no hay username (por alguna razón), salimos
+    if (!usernameInput || !firstNameInput || !lastNameInput || !autoToggle) {
+      return;
+    }
+
+    // Si viene vacío => modo automático
+    let autoUsername = !usernameInput.value;
+    autoToggle.checked = autoUsername;
+
+    function cleanNombre(str){
+      return (str || '').trim().toLowerCase().replace(/\s+/g, '');
+    }
+
+    // Primer apellido = primera palabra del campo apellidos
+    function getPrimerApellido() {
+      const raw = (lastNameInput.value || '').trim();
+      if (!raw) return '';
+      const firstPart = raw.split(/\s+/)[0];   // "Moreno Quintana" -> "Moreno"
+      return firstPart.toLowerCase();
+    }
+
+    function generarUsername() {
+      if (!autoUsername) return;
+
+      const first = cleanNombre(firstNameInput.value); // nombre sin espacios
+      const last  = getPrimerApellido();               // primer apellido solo
+
+      if (!first || !last) return;
+
+      const base = first.slice(0, 3) + '.' + last;     // ej: "vic.moreno"
+      usernameInput.value = base;
+    }
+
+    function updateReadonly(){
+      if (autoUsername) {
+        usernameInput.readOnly = true;
+        usernameInput.classList.add('bg-light');
+      } else {
+        usernameInput.readOnly = false;
+        usernameInput.classList.remove('bg-light');
+      }
+    }
+
+    // Toggle: activar / desactivar auto
+    autoToggle.addEventListener('change', function () {
+      autoUsername = autoToggle.checked;
+      updateReadonly();
+      if (autoUsername) {
+        generarUsername();
+      }
+    });
+
+    // Recalcular username si cambian nombre o apellidos y está en modo auto
+    firstNameInput.addEventListener('input', generarUsername);
+    lastNameInput.addEventListener('input', generarUsername);
+
+    // Si el admin escribe manualmente, desactiva el modo auto
+    usernameInput.addEventListener('input', function () {
+      if (autoUsername) {
+        autoUsername = false;
+        autoToggle.checked = false;
+        updateReadonly();
+      }
+    });
+
+    // Estado inicial
+    updateReadonly();
+    if (autoUsername) {
+      generarUsername();
+    }
+  });
+</script>
 {% endblock %}

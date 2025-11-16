@@ -20,13 +20,121 @@
                data-url="{% url 'api_productos_suggest' %}"></div>
           <div class="form-text">Escribe al menos 2 letras para buscar en catálogos (Local/CIMA/RxNorm).</div>
         </div>
+
         <div class="col-md-6">
           {{ form.potencia.label_tag }}
           {{ form.potencia }}
         </div>
+
+        {# FORMA FARMACÉUTICA CON AUTOCOMPLETE + NORMALIZACIÓN SIN TILDES #}
         <div class="col-md-6">
           {{ form.forma.label_tag }}
-          {{ form.forma }}
+
+          <!-- Input enlazado al campo forma del form -->
+          <input type="text"
+                 name="{{ form.forma.name }}"
+                 id="{{ form.forma.id_for_label }}"
+                 class="form-control"
+                 list="lista-formas-medicamento"
+                 value="{{ form.forma.value|default_if_none:'' }}"
+                 placeholder="Ej: Comprimido, Jarabe, Gotas…">
+
+          <!-- Lista de formas farmacéuticas -->
+          <datalist id="lista-formas-medicamento">
+            <!-- Sólidos orales -->
+            <option value="Comprimido"></option>
+            <option value="Comprimido recubierto"></option>
+            <option value="Comprimido efervescente"></option>
+            <option value="Comprimido sublingual"></option>
+            <option value="Comprimido bucodispersable"></option>
+            <option value="Cápsula dura"></option>
+            <option value="Cápsula blanda"></option>
+            <option value="Cápsula de liberación prolongada"></option>
+            <option value="Tableta"></option>
+            <option value="Tableta masticable"></option>
+            <option value="Gragea"></option>
+            <option value="Granulado"></option>
+            <option value="Polvo para solución oral"></option>
+            <option value="Polvo para suspensión oral"></option>
+
+            <!-- Líquidos orales -->
+            <option value="Solución oral"></option>
+            <option value="Suspensión oral"></option>
+            <option value="Jarabe"></option>
+            <option value="Emulsión oral"></option>
+            <option value="Gotas orales"></option>
+
+            <!-- Oftálmicos -->
+            <option value="Colirio (gotas oftálmicas)"></option>
+            <option value="Pomada oftálmica"></option>
+            <option value="Gel oftálmico"></option>
+
+            <!-- Nasales -->
+            <option value="Gotas nasales"></option>
+            <option value="Spray nasal"></option>
+            <option value="Solución nasal"></option>
+
+            <!-- Óticos -->
+            <option value="Gotas óticas"></option>
+            <option value="Suspensión ótica"></option>
+
+            <!-- Inyectables -->
+            <option value="Solución inyectable"></option>
+            <option value="Solución inyectable intravenosa"></option>
+            <option value="Solución inyectable intramuscular"></option>
+            <option value="Solución inyectable subcutánea"></option>
+            <option value="Suspensión inyectable"></option>
+            <option value="Emulsión inyectable"></option>
+            <option value="Polvo para solución inyectable"></option>
+            <option value="Polvo para suspensión inyectable"></option>
+            <option value="Concentrado para solución inyectable"></option>
+            <option value="Liofilizado para solución inyectable"></option>
+
+            <!-- Tópicos -->
+            <option value="Crema"></option>
+            <option value="Pomada"></option>
+            <option value="Gel tópico"></option>
+            <option value="Loción"></option>
+            <option value="Emulsión tópica"></option>
+            <option value="Solución tópica"></option>
+            <option value="Spray tópico"></option>
+            <option value="Aerosol cutáneo"></option>
+            <option value="Espuma cutánea"></option>
+
+            <!-- Rectales / vaginales -->
+            <option value="Supositorio"></option>
+            <option value="Óvulo vaginal"></option>
+            <option value="Crema vaginal"></option>
+            <option value="Gel vaginal"></option>
+            <option value="Solución vaginal"></option>
+
+            <!-- Inhalatorios -->
+            <option value="Inhalador presurizado"></option>
+            <option value="Inhalador de polvo seco"></option>
+            <option value="Solución para nebulización"></option>
+            <option value="Suspensión para nebulización"></option>
+
+            <!-- Parches -->
+            <option value="Parche transdérmico"></option>
+            <option value="Parche medicamentoso"></option>
+
+            <!-- Otros -->
+            <option value="Implante"></option>
+            <option value="Dispositivo intravaginal"></option>
+            <option value="Dispositivo intrauterino medicado"></option>
+            <option value="Enjuague bucal"></option>
+            <option value="Colutorio"></option>
+            <option value="Solución para irrigación"></option>
+          </datalist>
+
+          {% if form.forma.help_text %}
+            <div class="form-text">{{ form.forma.help_text }}</div>
+          {% endif %}
+          {% if form.forma.errors %}
+            <div class="invalid-feedback d-block">
+              {% for e in form.forma.errors %}{{ e }}{% endfor %}
+            </div>
+          {% endif %}
         </div>
       </div>
 
@@ -43,5 +151,46 @@
 
 {% block extra_js %}
 <script src="{% static 'landing/producto_suggest.js' %}"></script>
+
+<script>
+  // Permitir escribir sin tilde y mapear a la forma "oficial" si existe
+  (function() {
+    const input = document.getElementById('{{ form.forma.id_for_label }}');
+    const datalist = document.getElementById('lista-formas-medicamento');
+    if (!input || !datalist) return;
+
+    const normalize = (s) => (s || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')              // separa letras y tildes
+      .replace(/[\u0300-\u036f]/g,'')// elimina tildes
+      .trim();
+
+    const options = Array.from(datalist.querySelectorAll('option')).map(opt => ({
+      value: opt.value,
+      norm: normalize(opt.value)
+    }));
+
+    function autocanonizar() {
+      const actual = normalize(input.value);
+      if (!actual) return;
+
+      // Coincidencia exacta sin tildes
+      let match = options.find(o => o.norm === actual);
+
+      // Si no hay exacta, probamos con "empieza por"
+      if (!match) {
+        match = options.find(o => o.norm.startsWith(actual));
+      }
+
+      if (match) {
+        input.value = match.value; // deja la versión con tildes bien escrita
+      }
+    }
+
+    // Al salir del campo, ajustamos
+    input.addEventListener('blur', autocanonizar);
+  })();
+</script>
 {% endblock %}
 {% endblock %}

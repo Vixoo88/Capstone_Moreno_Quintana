@@ -4,7 +4,10 @@
   {% load static roles_tags %}
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SIFA</title>
+  <title>KIBEN</title>
+
+  {# Favicon (icono en la pestaña del navegador) #}
+  <link rel="icon" type="image/png" href="{% static 'landing/kiben-icon.png' %}">
 
   <!-- Fonts + Bootstrap + Icons (CDN) -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +24,12 @@
 
 <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
   <div class="container">
-    <a class="navbar-brand nav-brand" href="{% url 'home_public' %}">
-      <i class="bi bi-hospital me-2"></i>SIFA
+    {# Si es doctor y está logueado, el logo lleva al dashboard #}
+    <a class="navbar-brand nav-brand"
+       href="{% if user.is_authenticated and user|is_doctor %}{% url 'dashboard' %}{% else %}{% url 'home_public' %}{% endif %}">
+      <i class="bi bi-hospital me-2"></i>KIBEN
     </a>
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav" aria-controls="topnav" aria-expanded="false" aria-label="Menú">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -32,11 +38,15 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
         {% if user.is_authenticated %}
-          {# Panel: admin, cuidadora, TENS y doctor #}
+          {# Panel / Inicio: admin, cuidadora, TENS y doctor #}
           {% if user|is_admin or user|is_cuidadora or user|is_tens or user|is_doctor %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'dashboard' %}">
-                <i class="bi bi-speedometer2 me-1"></i>Panel
+                {% if user|is_doctor %}
+                  <i class="bi bi-house-heart me-1"></i>Inicio
+                {% else %}
+                  <i class="bi bi-speedometer2 me-1"></i>Alertas
+                {% endif %}
               </a>
             </li>
           {% endif %}
@@ -54,7 +64,7 @@
           {% if user|is_admin or user|is_cuidadora or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'admin_list_hoy' %}">
-                <i class="bi bi-capsule-pill me-1"></i>Administración
+                <i class="bi bi-capsule-pill me-1"></i>Medicación
               </a>
             </li>
           {% endif %}
@@ -63,16 +73,16 @@
           {% if user|is_admin or user|is_tens %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'asignaciones_hoy' %}">
-                <i class="bi bi-people-gear me-1"></i>Asignar cuidadores
+                <i class="bi bi-people-fill me-1"></i>Asignación cuidadores
               </a>
             </li>
           {% endif %}
 
-          {# Usuarios (solo admin) #}
+          {# Funcionarios (solo admin) #}
           {% if user|is_admin %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'user_list' %}">
-                <i class="bi bi-person-gear me-1"></i>Usuarios
+                <i class="bi bi-person-gear me-1"></i>Funcionarios
               </a>
             </li>
           {% endif %}
@@ -95,9 +105,38 @@
 
       <div class="d-flex gap-2">
         {% if user.is_authenticated %}
-          <span class="navbar-text me-2 small text-secondary">
-            <i class="bi bi-person-circle me-1"></i>{{ user.get_full_name|default:user.username }}
-          </span>
+          <div class="d-flex align-items-center gap-2 me-2">
+            {# Chip de rol a la izquierda del nombre (unisex) #}
+            {% if user|is_admin %}
+              <span class="badge rounded-pill fw-semibold text-uppercase small"
+                    style="background-color:#000080; color:#ffffff;">
+                Enfermera/o
+              </span>
+            {% elif user|is_doctor %}
+              <span class="badge rounded-pill fw-semibold text-uppercase small"
+                    style="background-color:#ffffff; color:#000000; border:1px solid #000000;">
+                Doctor/a
+              </span>
+            {% elif user|is_tens %}
+              <span class="badge rounded-pill fw-semibold text-uppercase small"
+                    style="background-color:#00B6FF; color:#ffffff;">
+                TENS
+              </span>
+            {% elif user|is_cuidadora %}
+              <span class="badge rounded-pill fw-semibold text-uppercase small"
+                    style="background-color:#ff69b4; color:#ffffff;">
+                Cuidador/a
+              </span>
+            {% endif %}
+
+            {# NOMBRE CLICKEABLE -> MI PERFIL #}
+            <a href="{% url 'mi_perfil' %}"
+               class="navbar-text small text-secondary d-flex align-items-center text-decoration-none link-underline-opacity-0 link-underline-opacity-75-hover">
+              <i class="bi bi-person-circle me-1"></i>
+              {{ user.get_full_name|default:user.username }}
+            </a>
+          </div>
+
           <form method="post" action="{% url 'logout' %}" class="d-inline">
             {% csrf_token %}
             <button class="btn btn-outline-secondary btn-sm" type="submit">Salir</button>
@@ -126,7 +165,7 @@
 
 <footer class="container my-5 text-center footer-small">
   <hr>
-  <div>SIFA — Sistema de Inventario y Flujo de Abastecimiento</div>
+  <div>KIBEN — Sistema de STOCK</div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

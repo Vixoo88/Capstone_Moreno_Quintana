@@ -1,76 +1,162 @@
 {% extends 'base.html' %}
 {% load roles_tags %}
 {% block content %}
-<div class="container py-4">
+<div class="container py-4" style="max-width: 1100px;">
 
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h2 class="page-title mb-0">Residentes</h2>
+  {# Encabezado #}
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center"
+           style="width:44px;height:44px;">
+        <i class="bi bi-people-fill text-primary"></i>
+      </div>
+      <div>
+        <h2 class="page-title mb-0">Residentes</h2>
+        <p class="small text-secondary mb-0">
+          Gestiona la lista de residentes y accede rápidamente a sus fichas.
+        </p>
+      </div>
+    </div>
 
     {% if user|is_admin %}
-      <a class="btn btn-gradient" href="{% url 'residente_create' %}">
-        <i class="bi bi-person-plus me-1"></i> Nuevo residente
+      <a class="btn btn-gradient d-flex align-items-center gap-1"
+         href="{% url 'residente_create' %}">
+        <i class="bi bi-person-plus"></i>
+        <span>Nuevo residente</span>
       </a>
     {% endif %}
   </div>
 
-  {# Filtros #}
-  <form method="get" class="row g-2 align-items-end mb-3">
-    <div class="col-12 col-sm-6 col-md-5 col-lg-4">
-      <label class="form-label small">Buscar</label>
-      <input type="search" name="q" value="{{ q }}" class="form-control"
-             placeholder="Nombre o RUT…">
-    </div>
+  {# Filtros en tarjeta, responsive #}
+  <div class="glass-card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      {# BUSCADOR #}
+      <div class="col-12 col-sm-6 col-md-5 col-lg-4">
+        <label class="form-label small text-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="search"
+                 name="q"
+                 value="{{ q }}"
+                 class="form-control"
+                 placeholder="Nombre o RUT…">
+        </div>
+      </div>
 
-    <div class="col-6 col-sm-3 col-md-3 col-lg-2">
-      <label class="form-label small">Sexo</label>
-      <select name="sexo" class="form-select" onchange="this.form.submit()">
-        <option value="" {% if not sexo %}selected{% endif %}>Todos</option>
-        <option value="F" {% if sexo == 'F' %}selected{% endif %}>Femenino</option>
-        <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
-        <option value="O" {% if sexo == 'O' %}selected{% endif %}>Otro / No especificado</option>
-      </select>
-    </div>
+      {# SEXO #}
+      <div class="col-6 col-sm-3 col-md-3 col-lg-2">
+        <label class="form-label small text-secondary">Sexo</label>
+        <select name="sexo"
+                class="form-select form-select-sm"
+                onchange="this.form.submit()">
+          <option value="" {% if not sexo %}selected{% endif %}>Todos</option>
+          <option value="F" {% if sexo == 'F' %}selected{% endif %}>Femenino</option>
+          <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
+          <option value="O" {% if sexo == 'O' %}selected{% endif %}>Otro / No especificado</option>
+        </select>
+      </div>
 
-    <div class="col-6 col-sm-3 col-md-2 col-lg-2">
-      <label class="form-label d-none d-sm-block">&nbsp;</label>
-      <button class="btn btn-outline-secondary w-100">
-        <i class="bi bi-search me-1"></i> Filtrar
-      </button>
-    </div>
+      {# ESTADO (Activo / Inactivo / Todos) #}
+      <div class="col-6 col-sm-3 col-md-3 col-lg-2">
+        <label class="form-label small text-secondary">Estado</label>
+        <select name="estado"
+                class="form-select form-select-sm"
+                onchange="this.form.submit()">
+          <option value="" {% if not estado %}selected{% endif %}>Todos</option>
+          <option value="A" {% if estado == 'A' %}selected{% endif %}>Activos</option>
+          <option value="I" {% if estado == 'I' %}selected{% endif %}>Inactivos</option>
+        </select>
+      </div>
 
-    {% if q or sexo %}
-      <div class="col-12 col-sm-auto">
+      {# BOTÓN FILTRAR #}
+      <div class="col-6 col-sm-3 col-md-2 col-lg-2">
         <label class="form-label d-none d-sm-block">&nbsp;</label>
-        <a class="btn btn-link" href="{% url 'residente_list' %}">Limpiar</a>
+        <button class="btn btn-outline-secondary w-100 btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+      </div>
+
+      {# LIMPIAR FILTROS #}
+      {% if q or sexo or estado %}
+        <div class="col-12 col-sm-auto">
+          <label class="form-label d-none d-sm-block">&nbsp;</label>
+          <a class="btn btn-link btn-sm" href="{% url 'residente_list' %}">
+            Limpiar filtros
+          </a>
+        </div>
+      {% endif %}
+    </form>
+
+    {% if total is not None %}
+      <div class="small text-secondary mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        {{ total }} resultado{{ total|pluralize }}
       </div>
     {% endif %}
-  </form>
+  </div>
 
-  {% if total is not None %}
-    <div class="small text-secondary mb-2">{{ total }} resultado{{ total|pluralize }}</div>
-  {% endif %}
-
+  {# Cards de residentes #}
   {% if residentes %}
     <div class="row g-3">
       {% for r in residentes %}
-        <div class="col-md-6 col-lg-4">
-          <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-start justify-content-between">
-              <div class="me-2">
-                <div class="fw-bold text-truncate">{{ r.nombre_completo }}</div>
-                {% if r.rut %}
-                  <div class="small text-secondary">RUT: {{ r.rut }}</div>
-                {% endif %}
-                {% if r.sexo %}
-                  <div class="small text-muted">{{ r.get_sexo_display }}</div>
-                {% endif %}
-              </div>
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="glass-card p-3 h-100 position-relative">
+            {# Badge fijo en la esquina superior derecha #}
+            <div class="position-absolute top-0 end-0 m-2">
               {% if r.activo %}
-                <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+                <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                  <i class="bi bi-check-circle me-1"></i>Activo
+                </span>
               {% else %}
-                <span class="badge bg-secondary">Inactivo</span>
+                <span class="badge bg-secondary small">
+                  <i class="bi bi-slash-circle me-1"></i>Inactivo
+                </span>
               {% endif %}
             </div>
+
+            {# Contenido con padding a la derecha para no meterse bajo el badge #}
+            <div class="d-flex align-items-start gap-2 pe-5">
+              {# Avatar con inicial #}
+              <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+                   style="width:40px;height:40px;">
+                <span class="fw-bold text-primary">
+                  {{ r.nombre_completo|default:"?"|slice:":1" }}
+                </span>
+              </div>
+
+              <div class="flex-grow-1 me-2">
+                <div class="fw-semibold text-wrap">
+                  {{ r.nombre_completo }}
+                </div>
+
+                {% if r.rut %}
+                  <div class="small text-secondary mt-1 text-truncate">
+                    <i class="bi bi-card-text me-1"></i>RUT: {{ r.rut }}
+                  </div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-1 mt-1 small">
+                  {% if r.sexo %}
+                    {% if r.sexo == 'F' %}
+                      <span class="badge text-bg-light border">
+                        <i class="bi bi-gender-female me-1"></i>{{ r.get_sexo_display }}
+                      </span>
+                    {% elif r.sexo == 'M' %}
+                      <span class="badge text-bg-light border">
+                        <i class="bi bi-gender-male me-1"></i>{{ r.get_sexo_display }}
+                      </span>
+                    {% else %}
+                      <span class="badge text-bg-light border">
+                        <i class="bi bi-gender-ambiguous me-1"></i>{{ r.get_sexo_display }}
+                      </span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
             <a class="stretched-link" href="{% url 'residente_detail' r.id %}"></a>
           </div>
         </div>
@@ -78,7 +164,12 @@
     </div>
   {% else %}
     <div class="glass-card p-4 text-center">
-      <div class="text-secondary">No se encontraron residentes con esos filtros.</div>
+      <div class="mb-2">
+        <i class="bi bi-search text-secondary" style="font-size: 32px;"></i>
+      </div>
+      <div class="text-secondary">
+        No se encontraron residentes con esos filtros.
+      </div>
     </div>
   {% endif %}
 </div>

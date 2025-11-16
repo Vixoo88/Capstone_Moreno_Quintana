@@ -38,6 +38,9 @@ urlpatterns = [
     path("asignaciones/toggle/", views.asignaciones_toggle_modo, name="asignaciones_toggle_modo"),
     path("asignaciones/limpiar/", views.asignaciones_limpiar, name="asignaciones_limpiar"),
 
+    # path("residentes/<int:pk>/registro-mensual-todos/", views.registro_mensual_todos, name="registro_mensual_todos"),
+
+
     # CRUD usuarios
     path("users/", views.user_list, name="user_list"),
     path("users/new/", views.user_create, name="user_create"),
@@ -53,5 +56,7 @@ urlpatterns = [
 
     # MANDAR MENSAJE
     path("asignaciones/avisar-meds/", views.asignaciones_avisar_meds, name="asignaciones_avisar_meds"),
+
+    path("mi-perfil/", views.mi_perfil, name="mi_perfil"),
 
 ]

@@ -128,20 +128,36 @@ class AdminUserUpdateForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email", "is_active"]
+        # 👉 Agregamos "username" para poder editarlo
+        fields = ["username", "first_name", "last_name", "email", "is_active"]
 
     def __init__(self, *args, **kwargs):
         self.instance: User = kwargs.get("instance")
         super().__init__(*args, **kwargs)
         # Precarga el rol actual (primer grupo que coincida)
-        current = next((g.name for g in self.instance.groups.all() if g.name in dict(ROLE_CHOICES)), None)
+        current = next(
+            (g.name for g in self.instance.groups.all()
+             if g.name in dict(ROLE_CHOICES)),
+            None
+        )
         if current:
             self.fields["role"].initial = current
+
+    def clean_username(self):
+        username = (self.cleaned_data.get("username") or "").strip()
+        if not username:
+            raise forms.ValidationError("Este campo es obligatorio.")
+        # Validar que no choque con otros usuarios
+        qs = User.objects.filter(username=username).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("Ya existe otro usuario con este nombre.")
+        return username
 
     def save(self, commit=True):
         user = super().save(commit)
         assign_single_role(user, self.cleaned_data["role"])
         return user
+
 
 class AdminUserPasswordForm(forms.Form):
     password1 = forms.CharField(label="Nueva contraseña", widget=forms.PasswordInput)
