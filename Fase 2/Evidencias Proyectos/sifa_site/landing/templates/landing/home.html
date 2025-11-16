@@ -3,95 +3,293 @@
 
 {% block content %}
 
-<!-- ====== CSS específico de esta página ====== -->
 <style>
-  /* ====== HERO / CARRUSEL con background-image (ajuste perfecto) ====== */
+  /* ====== HERO / CARRUSEL ====== */
   .hero-wrapper {
     position: relative;
     overflow: hidden;
   }
 
-  /* Altura responsiva:
-     - mínimo: 340px
-     - preferido: 62vh
-     - máximo: 760px
-     Cambia los valores si lo quieres más alto/bajo.
-  */
   .hero-slide {
     position: relative;
-    height: clamp(340px, 62vh, 760px);
-    isolation: isolate; /* para pseudo-elementos */
+    height: clamp(360px, 70vh, 780px);
+    isolation: isolate;
+    color: #fff;
   }
 
-  /* Imagen como FONDO: siempre llena, sin deformarse ni bandas */
   .hero-bg {
     position: absolute;
     inset: 0;
     background-position: center;
     background-repeat: no-repeat;
-    background-size: cover; /* <- clave para que se ajuste sin bandas */
+    background-size: cover;
     z-index: 0;
+    transform: scale(1.02);
   }
 
-  /* Overlay suave para contraste en caso de que la foto tenga texto */
   .hero-slide::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.06) 40%, rgba(0,0,0,0.12));
+    background:
+      radial-gradient(circle at 0% 0%, rgba(0, 182, 255, .18), transparent 55%),
+      radial-gradient(circle at 100% 0%, rgba(255, 105, 180, .2), transparent 55%),
+      linear-gradient(120deg, rgba(0, 0, 0, .55), rgba(0, 0, 0, .35));
     z-index: 1;
     pointer-events: none;
   }
 
-  /* Asegurar visibilidad de flechas e indicadores por sobre el overlay */
-  .carousel-control-prev,
-  .carousel-control-next { z-index: 3; width: 10%; }
-
-  .carousel-indicators { z-index: 3; }
-  .carousel-indicators [data-bs-target] {
-    width: 10px; height: 10px; border-radius: 999px;
-    background: rgba(255,255,255,0.8);
-    margin: 0 6px;
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    align-items: center;
   }
-  .carousel-indicators .active { background: #fff; }
+
+  .hero-glass {
+    backdrop-filter: blur(14px);
+    background: rgba(15, 23, 42, 0.45);
+    border-radius: 1.25rem;
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    padding: 1.75rem 1.5rem;
+    max-width: 520px;
+    box-shadow: 0 22px 45px rgba(15, 23, 42, .55);
+  }
+
+  .hero-kiben-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .25rem .75rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, .7);
+  }
+
+  .hero-kiben-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #00B6FF;
+    box-shadow: 0 0 12px rgba(0, 182, 255, .7);
+  }
+
+  .hero-title {
+    font-size: clamp(1.9rem, 3.2vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: .6rem;
+  }
+
+  .hero-title span.accent {
+    background: linear-gradient(120deg, #00B6FF, #ff69b4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero-subtitle {
+    font-size: .95rem;
+    line-height: 1.5;
+    color: rgba(226, 232, 240, .9);
+    margin-bottom: 1.1rem;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem .9rem;
+    font-size: .78rem;
+    color: rgba(226, 232, 240, .8);
+  }
+
+  .hero-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+  }
+
+  .hero-meta i {
+    font-size: .85rem;
+  }
+
+  .hero-cta-main.btn-gradient {
+    border-radius: 999px;
+    padding-inline: 1.6rem;
+  }
+
+  .hero-cta-secondary {
+    border-radius: 999px;
+    border-color: rgba(226, 232, 240, .7);
+    color: #e2e8f0;
+  }
+
+  .hero-cta-secondary:hover {
+    background: rgba(15, 23, 42, .65);
+    color: #fff;
+  }
+
+  .hero-scroll-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    color: rgba(248, 250, 252, .85);
+    font-size: .76rem;
+  }
+
+  .hero-scroll-wheel {
+    width: 20px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(248, 250, 252, .8);
+    position: relative;
+  }
+
+  .hero-scroll-wheel::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 7px;
+    width: 3px;
+    height: 7px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(248, 250, 252, .9);
+    animation: wheel-move 1.3s ease-in-out infinite;
+  }
+
+  @keyframes wheel-move {
+    0% { opacity: 0; transform: translate(-50%, 0); }
+    25% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, 8px); }
+  }
+
+  .carousel-control-prev,
+  .carousel-control-next {
+    z-index: 4;
+    width: 10%;
+  }
+
+  .carousel-indicators {
+    z-index: 4;
+  }
+
+  .carousel-indicators [data-bs-target] {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(248, 250, 252, .7);
+    margin: 0 5px;
+  }
+
+  .carousel-indicators .active {
+    background: #fff;
+  }
 
   .carousel-control-prev-icon,
   .carousel-control-next-icon {
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+    filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.7));
   }
 
-  /* ====== Ajustes para móvil (<=576px): un poco más compacto ====== */
-  @media (max-width: 575.98px) {
-    .hero-slide { height: clamp(280px, 56vh, 560px); }
-    .carousel-control-prev,
-    .carousel-control-next { width: 16%; }
-    .carousel-control-prev-icon,
-    .carousel-control-next-icon { transform: scale(1.08); }
-    .carousel-indicators [data-bs-target] { width: 12px; height: 12px; margin: 0 8px; }
-    .carousel-indicators { bottom: 10px; }
+  /* Animaciones suaves */
+  .fade-in-up {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: fadeInUp .7s ease-out forwards;
   }
 
-  /* ====== Ajustes para tablet (576–991px) ====== */
-  @media (min-width: 576px) and (max-width: 991.98px) {
-    .hero-slide { height: clamp(320px, 58vh, 640px); }
-    .carousel-control-prev,
-    .carousel-control-next { width: 12%; }
+  .fade-in-delayed {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeInUp .7s ease-out forwards;
+    animation-delay: .25s;
+  }
+
+  @keyframes fadeInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   /* ====== utilidades / secciones ====== */
   .py-6 { padding-top: 4rem; padding-bottom: 4rem; }
-  .benefit-box {
-    background: #f8f9fa;
-    border: 1px solid #eef0f2;
-    border-radius: .75rem;
-    padding: 1.25rem 1rem;
-    text-align: center;
-    font-weight: 600;
+  .section-subtitle {
+    max-width: 620px;
+    margin: 0 auto 2.2rem;
   }
-  .min-vh-40 { min-height: 40vh; }
+
+  .benefit-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: .9rem;
+    padding: 1.35rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+    font-size: .95rem;
+  }
+
+  .benefit-box i {
+    font-size: 1.2rem;
+    color: #0d6efd;
+    margin-top: .1rem;
+  }
+
+  .timeline-step {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .timeline-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: .9rem;
+    background: #0d6efd;
+    color: #fff;
+    box-shadow: 0 6px 15px rgba(37, 99, 235, .35);
+  }
+
+  .timeline-body h5 {
+    margin-bottom: .25rem;
+    font-size: 1.02rem;
+  }
+
+  .timeline-body p {
+    margin-bottom: 0;
+    font-size: .9rem;
+  }
+
+  .contact-card {
+    border-radius: 1.25rem;
+    border: 1px solid #e5e7eb;
+  }
+
+  @media (max-width: 575.98px) {
+    .hero-slide { height: clamp(320px, 68vh, 640px); }
+    .hero-glass { padding: 1.2rem 1.1rem; max-width: 100%; }
+    .hero-title { font-size: 1.8rem; }
+  }
 </style>
 
-<!-- ===== HERO / CARRUSEL (3 imágenes) ===== -->
+<!-- ===== HERO / CARRUSEL ===== -->
 <section class="hero-wrapper" aria-label="Galería principal">
   <div
     id="heroCarousel"
@@ -112,21 +310,99 @@
       <!-- Slide 1 -->
       <div class="carousel-item active" aria-label="Imagen 1">
         <div class="hero-slide">
-          <div class="hero-bg" style="background-image: url('{% static 'img/1.png' %}');"></div>
+          <div class="hero-bg" style="background-image: url('{% static "img/1.png" %}');"></div>
+
+          <div class="hero-inner">
+            <div class="container">
+              <div class="hero-glass fade-in-up">
+                <div class="hero-kiben-pill mb-2">
+                  <span class="hero-kiben-dot"></span>
+                  <span>KIBEN · Gestión segura de medicamentos</span>
+                </div>
+                <h1 class="hero-title">
+                  Menos errores, más
+                  <span class="accent">tiempo con los residentes</span>.
+                </h1>
+                <p class="hero-subtitle">
+                  KIBEN organiza stock, horarios y administraciones para que Enfermería, TENS y cuidadoras
+                  trabajen sincronizados, con trazabilidad completa.
+                </p>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  <a href="{% url 'login' %}" class="btn btn-gradient hero-cta-main">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                    Entrar al sistema
+                  </a>
+                  <a href="#como-funciona" class="btn btn-outline-light hero-cta-secondary">
+                    <i class="bi bi-play-circle me-1"></i>
+                    Ver cómo funciona
+                  </a>
+                </div>
+                <div class="hero-meta">
+                  <span><i class="bi bi-shield-check"></i> Alertas automáticas de stock crítico</span>
+                  <span><i class="bi bi-clipboard2-check"></i> Registro de administración en tiempo real</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <!-- Slide 2 -->
       <div class="carousel-item" aria-label="Imagen 2">
         <div class="hero-slide">
-          <div class="hero-bg" style="background-image: url('{% static 'img/2.png' %}');"></div>
+          <div class="hero-bg" style="background-image: url('{% static "img/2.png" %}');"></div>
+          <div class="hero-inner">
+            <div class="container">
+              <div class="hero-glass fade-in-up">
+                <div class="hero-kiben-pill mb-2">
+                  <span class="hero-kiben-dot"></span>
+                  <span>Enfermería · Visión completa</span>
+                </div>
+                <h2 class="hero-title">
+                  Un panel para controlar
+                  <span class="accent">toda la medicación</span>.
+                </h2>
+                <p class="hero-subtitle">
+                  Visualiza residencias, tratamientos activos y próximos vencimientos. KIBEN te avisa antes de
+                  que falten medicamentos.
+                </p>
+                <div class="hero-meta">
+                  <span><i class="bi bi-capsule-pill"></i> Farmacia por residente</span>
+                  <span><i class="bi bi-activity"></i> Seguimiento de adherencia</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Slide 3 -->
       <div class="carousel-item" aria-label="Imagen 3">
         <div class="hero-slide">
-          <div class="hero-bg" style="background-image: url('{% static 'img/3.png' %}');"></div>
+          <div class="hero-bg" style="background-image: url('{% static "img/3.png" %}');"></div>
+          <div class="hero-inner">
+            <div class="container">
+              <div class="hero-glass fade-in-up">
+                <div class="hero-kiben-pill mb-2">
+                  <span class="hero-kiben-dot"></span>
+                  <span>Equipo completo sincronizado</span>
+                </div>
+                <h2 class="hero-title">
+                  Doctores, TENS y cuidadoras
+                  <span class="accent">en una misma plataforma</span>.
+                </h2>
+                <p class="hero-subtitle">
+                  Cada rol ve sólo lo que necesita: recetas, stock, horarios o registro de tomas, todo en un flujo
+                  simple y seguro.
+                </p>
+                <div class="hero-meta">
+                  <span><i class="bi bi-person-video3"></i> Roles y permisos por perfil</span>
+                  <span><i class="bi bi-clock-history"></i> Historial y auditoría de cambios</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -138,39 +414,63 @@
     <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next" aria-label="Siguiente">
       <span class="carousel-control-next-icon" aria-hidden="true"></span>
     </button>
+
+    <!-- Hint scroll -->
+    <div class="hero-scroll-hint d-none d-sm-flex">
+      <div class="hero-scroll-wheel"></div>
+      <span>Desplázate para conocer más</span>
+    </div>
   </div>
 </section>
 
-<!-- ¿Qué es SIFA? -->
+<!-- ¿Qué es KIBEN? -->
 <section id="que-es" class="py-6">
   <div class="container">
-    <h2 class="text-center fw-bold mb-4">¿Qué es KIBEN?</h2>
-    <p class="lead text-center text-muted mb-5">
-      Plataforma que reduce tiempos operativos y asegura disponibilidad de medicamentos en residencias.
+    <h2 class="text-center fw-bold mb-2">¿Qué es KIBEN?</h2>
+    <p class="lead text-center text-muted section-subtitle">
+      Un sistema pensado para residencias que necesitan garantizar que cada dosis correcta
+      llegue al residente correcto, en el momento correcto.
     </p>
 
     <div class="row g-4">
       <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0">
+        <div class="card h-100 shadow-sm border-0 fade-in-up">
           <div class="card-body p-4">
+            <div class="mb-2 text-primary">
+              <i class="bi bi-box-seam fs-3"></i>
+            </div>
             <h5 class="card-title fw-bold">Inventario central</h5>
-            <p class="card-text text-muted">Recepción, bodega, lotes y vencimientos bajo control.</p>
+            <p class="card-text text-muted mb-0">
+              Recepción, bodega, lotes y vencimientos siempre visibles, con alertas automáticas de stock crítico.
+            </p>
           </div>
         </div>
       </div>
+
       <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0">
+        <div class="card h-100 shadow-sm border-0 fade-in-up" style="animation-delay:.12s;">
           <div class="card-body p-4">
+            <div class="mb-2 text-success">
+              <i class="bi bi-person-vcard fs-3"></i>
+            </div>
             <h5 class="card-title fw-bold">Asignación por residente</h5>
-            <p class="card-text text-muted">Stock y recetas vinculadas a cada paciente.</p>
+            <p class="card-text text-muted mb-0">
+              Cada tratamiento se vincula a un residente, con su stock destinado y su calendario de administración.
+            </p>
           </div>
         </div>
       </div>
+
       <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0">
+        <div class="card h-100 shadow-sm border-0 fade-in-up" style="animation-delay:.22s;">
           <div class="card-body p-4">
-            <h5 class="card-title fw-bold">Horarios y adherencia</h5>
-            <p class="card-text text-muted">Registros de administración y alertas en tiempo real.</p>
+            <div class="mb-2 text-warning">
+              <i class="bi bi-clock-history fs-3"></i>
+            </div>
+            <h5 class="card-title fw-bold">Registro y trazabilidad</h5>
+            <p class="card-text text-muted mb-0">
+              Administra, omite o rechaza dosis con un clic, dejando registro para auditoría y seguimiento clínico.
+            </p>
           </div>
         </div>
       </div>
@@ -181,15 +481,63 @@
 <!-- Cómo funciona -->
 <section id="como-funciona" class="py-6 bg-white border-top border-bottom">
   <div class="container">
-    <h2 class="text-center fw-bold mb-4">Cómo funciona</h2>
+    <h2 class="text-center fw-bold mb-2">Cómo funciona KIBEN en el día a día</h2>
+    <p class="text-center text-muted section-subtitle">
+      Cada rol tiene su propia vista, pero todos comparten la misma información actualizada.
+    </p>
+
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <ol class="list-group list-group-numbered shadow-sm">
-          <li class="list-group-item p-4">Enfermería funciona como superusuario, tiene acceso al panel de administración de usuarios, medicamentos y pacientes.</li>
-          <li class="list-group-item p-4">Doctores crean, validan y visualizan las recetas digitales por paciente.</li>
-          <li class="list-group-item p-4">TENS preparan farmacia por paciente, asignan y destinan frascos por cuidadora.</li>
-          <li class="list-group-item p-4">Cuidadores administran según horario y registran la toma.</li>
-        </ol>
+        <div class="list-group shadow-sm">
+          <div class="list-group-item p-4">
+            <div class="timeline-step">
+              <div class="timeline-badge" style="background:#000080;">1</div>
+              <div class="timeline-body">
+                <h5>Enfermería (Enfermera/o)</h5>
+                <p class="text-muted">
+                  Gestiona usuarios, medicamentos, stock y pacientes. Revisa alertas de stock crítico y controla
+                  asignaciones diarias.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="list-group-item p-4">
+            <div class="timeline-step">
+              <div class="timeline-badge" style="background:#000000;">2</div>
+              <div class="timeline-body">
+                <h5>Doctor/a</h5>
+                <p class="text-muted">
+                  Crea y valida recetas digitales por residente, ajusta dosis y horarios y deja indicaciones para el equipo asistencial.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="list-group-item p-4">
+            <div class="timeline-step">
+              <div class="timeline-badge" style="background:#00B6FF;">3</div>
+              <div class="timeline-body">
+                <h5>TENS</h5>
+                <p class="text-muted">
+                  Prepara farmacia por paciente, controla stock asignado y distribuye frascos a cuidadoras según el plan del día.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="list-group-item p-4">
+            <div class="timeline-step">
+              <div class="timeline-badge" style="background:#ff69b4;">4</div>
+              <div class="timeline-body">
+                <h5>Cuidador/a</h5>
+                <p class="text-muted mb-0">
+                  Administra medicamentos en los horarios definidos y registra cada toma, omisión o rechazo desde una vista simple en su teléfono o computador.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div> <!-- list-group -->
       </div>
     </div>
   </div>
@@ -198,11 +546,46 @@
 <!-- Beneficios -->
 <section id="beneficios" class="py-6">
   <div class="container">
-    <h2 class="text-center fw-bold mb-4">Beneficios</h2>
+    <h2 class="text-center fw-bold mb-2">Beneficios para la residencia</h2>
+    <p class="text-center text-muted section-subtitle">
+      No es sólo un sistema de stock: es una herramienta para trabajar más tranquilos
+      y con mejor información clínica.
+    </p>
+
     <div class="row g-4">
-      <div class="col-md-4"><div class="benefit-box">Menos errores de administración</div></div>
-      <div class="col-md-4"><div class="benefit-box">Trazabilidad y auditoría</div></div>
-      <div class="col-md-4"><div class="benefit-box">Ahorro de tiempo operativo</div></div>
+      <div class="col-md-4">
+        <div class="benefit-box">
+          <i class="bi bi-activity"></i>
+          <div>
+            Menos errores de administración<br>
+            <span class="text-muted small">
+              Horarios claros, residentes asignados y registro inmediato de cada evento.
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="benefit-box">
+          <i class="bi bi-file-earmark-text"></i>
+          <div>
+            Trazabilidad y auditoría<br>
+            <span class="text-muted small">
+              Historial de dosis, usuarios y cambios para respaldar decisiones clínicas.
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="benefit-box">
+          <i class="bi bi-clock"></i>
+          <div>
+            Ahorro de tiempo operativo<br>
+            <span class="text-muted small">
+              Menos planillas manuales, más tiempo para acompañar a los residentes.
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -210,11 +593,16 @@
 <!-- Contacto -->
 <section id="contacto" class="py-6 bg-white border-top">
   <div class="container">
-    <h2 class="text-center fw-bold mb-4">Contacto</h2>
+    <h2 class="text-center fw-bold mb-3">Conversemos</h2>
+    <p class="text-center text-muted section-subtitle">
+      Si quieres probar KIBEN en tu residencia o tienes dudas sobre cómo se adapta a tu realidad,
+      déjanos un mensaje.
+    </p>
+
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <form class="card shadow-sm border-0">
-          <div class="card-body p-4">
+        <form class="card shadow-sm border-0 contact-card">
+          <div class="card-body p-4 p-md-5">
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Nombre</label>
@@ -225,12 +613,21 @@
                 <input type="email" class="form-control" placeholder="nombre@correo.com">
               </div>
               <div class="col-12">
+                <label class="form-label">Residencia / Organización</label>
+                <input type="text" class="form-control" placeholder="Nombre de tu residencia">
+              </div>
+              <div class="col-12">
                 <label class="form-label">Mensaje</label>
-                <textarea class="form-control" rows="4" placeholder="Cuéntanos sobre tu residencia"></textarea>
+                <textarea class="form-control" rows="4" placeholder="Cuéntanos cómo administran la medicación hoy y qué les gustaría mejorar."></textarea>
               </div>
             </div>
-            <div class="mt-4 d-flex justify-content-end">
-              <button type="button" class="btn btn-primary">Enviar</button>
+            <div class="mt-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <small class="text-muted">
+                Responderemos a tu correo con más información y opciones de demo.
+              </small>
+              <button type="button" class="btn btn-primary">
+                <i class="bi bi-send me-1"></i>Enviar
+              </button>
             </div>
           </div>
         </form>
